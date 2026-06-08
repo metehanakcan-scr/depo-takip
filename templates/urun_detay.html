@@ -1,0 +1,323 @@
+{% extends "base.html" %}
+{% block content %}
+
+<style>
+    /* --- GENEL FERAHLIK VE TASARIM --- */
+    .detay-container { width: 100%; max-width: 1200px; margin: 0 auto; padding: 20px; }
+    
+    /* Üst Bilgi Kartı */
+    .info-card { 
+        background: white; border-radius: 24px; padding: 35px; 
+        box-shadow: 0 10px 40px rgba(0,0,0,0.04); border-top: 10px solid var(--primary);
+        margin-bottom: 30px;
+    }
+
+    .bilgi-grid { 
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); 
+        gap: 25px; margin-top: 25px; 
+    }
+
+    /* --- HAREKET GEÇMİŞİ TABLOSU (Genişletilmiş ve Sabit Hizalı) --- */
+    .history-card { background: white; border-radius: 24px; padding: 35px; box-shadow: 0 10px 40px rgba(0,0,0,0.04); }
+    
+    .custom-table { 
+        width: 100%; 
+        border-collapse: separate; 
+        border-spacing: 0 12px; 
+        margin-top: 15px; 
+    }
+    .custom-table th { 
+        padding: 15px 25px; color: #94a3b8; font-size: 11px; font-weight: 800; 
+        text-transform: uppercase; letter-spacing: 1px; border: none; text-align: left;
+    }
+    .custom-table td { 
+        padding: 20px 25px; 
+        background: #fdfdfd; border-top: 1px solid #f1f5f9; border-bottom: 1px solid #f1f5f9;
+        font-size: 14px;
+        vertical-align: middle !important; 
+        text-align: left;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .custom-table td:first-child { border-left: 1px solid #f1f5f9; border-top-left-radius: 15px; border-bottom-left-radius: 15px; }
+    .custom-table td:last-child { border-right: 1px solid #f1f5f9; border-top-right-radius: 15px; border-bottom-right-radius: 15px; }
+
+    /* Rozetler */
+    .status-badge { padding: 6px 14px; border-radius: 10px; font-size: 11px; font-weight: 800; }
+    .type-in { background: #ecfdf5; color: #10b981; }
+    .type-out { background: #fff1f2; color: #f43f5e; }
+    .type-edit { background: #eff6ff; color: #3b82f6; }
+
+    /* Girişler */
+    label { font-weight: 700; color: #64748b; font-size: 12px; margin-bottom: 8px; display: block; }
+    input, select { 
+        width: 100%; padding: 14px; border-radius: 12px; border: 2px solid #f1f5f9; 
+        background: #f8fafc; font-weight: 600;
+    }
+
+    /* --- MODAL TASARIMI --- */
+    .glass-overlay { 
+        position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); 
+        backdrop-filter: blur(8px); z-index: 10000; 
+        display: none; align-items: center; justify-content: center; 
+    }
+
+    /* --- MOBİL UYUM --- */
+    @media (max-width: 768px) {
+        .custom-table { table-layout: auto; }
+        .custom-table thead { display: none; }
+        .custom-table td { display: flex; justify-content: space-between; padding: 12px 20px !important; border: none !important; text-align: right !important; }
+        .custom-table tr { display: block; background: #fff; border: 1px solid #e2e8f0; border-radius: 20px; margin-bottom: 15px; padding: 10px 0; }
+        .custom-table td::before { content: attr(data-label); font-weight: 800; color: #94a3b8; font-size: 10px; float: left; }
+        .custom-table td:first-child {
+            flex-direction: column;
+            gap: 2px;
+            padding: 12px !important;
+            text-align: center !important;
+        }
+    }
+</style>
+
+<div class="detay-container">
+    <div class="info-card">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2 style="margin:0; font-weight: 800; letter-spacing: -1.5px; font-size: 1.8rem;">📦 {{ urun.isim }}</h2>
+            <a href="/urun-listesi/" class="btn" style="background:#f1f5f9; color:#475569; border-radius: 12px; font-weight: 700;">⬅ LİSTEYE DÖN</a>
+        </div>
+
+        <input type="hidden" id="b" value="{{ urun.barkod }}">
+        
+        <div class="bilgi-grid">
+            <div>
+                <label>BARKOD NO</label>
+                <div style="padding: 14px; background: #f1f5f9; border-radius: 12px; font-weight: 800; color: #1e293b;">{{ urun.barkod }}</div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-bold">📦 Ürün Adı</label>
+                <input type="text" id="detay_isim" class="form-control" value="{{ urun.isim }}" 
+                    {% if not get_user(request).can_edit_product and get_user(request).rol_adi != 'ADMIN' %} readonly {% endif %}>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-bold">🔢 Lot No</label>
+                <input type="text" id="detay_lot" class="form-control" value="{{ urun.lot }}" 
+                    {% if not get_user(request).can_edit_product and get_user(request).rol_adi != 'ADMIN' %} readonly {% endif %}>
+            </div>
+            <div>
+                <label>KATEGORİ</label>
+                <select id="k" class="form-control">
+                    <option value="">Kategori Seçin</option>
+                    {% for kat in kategoriler %}
+                        <option value="{{ kat.ad }}" {% if urun.kategori and urun.kategori.ad == kat.ad %}selected{% endif %}>
+                            {{ kat.ad }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label>RAF / KONUM</label>
+                <select id="yer">
+                    <option value="">Raf Seçin</option>
+                    {% for y in yerler %}
+                        <option value="{{ y.ad }}" {% if urun.yer == y.ad %}selected{% endif %}>
+                            {{ y.ad }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div style="background: #eef2ff; padding: 15px; border-radius: 16px; text-align: center; border: 2px solid #dbeafe;">
+                <label style="color: #6366f1;">MEVCUT STOK</label>
+                <div style="font-size: 1.8rem; font-weight: 900; color: #4f46e5;">{{ urun.miktar }} <small style="font-size: 12px;">ADET</small></div>
+            </div>
+        </div>
+
+        {% if get_user(request).rol_adi == 'ADMIN' %}
+        <div style="display: flex; justify-content: space-between; margin-top: 30px; border-top: 1px solid #f1f5f9; padding-top: 20px;">
+            <button onclick="urunuSilOnay()" class="btn" style="color: var(--danger); font-weight: 700; border: none; background: transparent;">🗑️ ÜRÜNÜ TAMAMEN SİL</button>
+            <button onclick="guncelle()" class="btn btn-primary" style="padding: 12px 40px; border-radius: 12px; font-weight: 800; box-shadow: 0 10px 20px rgba(99,102,241,0.2);">💾 DEĞİŞİKLİKLERİ KAYDET</button>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="history-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+            <h3 style="margin: 0; font-weight: 800; color: #0f172a;">📜 İŞLEM GEÇMİŞİ</h3>
+            <input type="text" id="ara_detay" onkeyup="filtreleDetay()" placeholder="Tabloda ara..." style="width: 250px; background: #fff; border: 2px solid #f1f5f9; border-radius: 12px; padding: 10px;">
+        </div>
+        
+        <div class="table-responsive">
+            <table id="detay_tablo" class="custom-table">
+                <thead>
+                    <tr>
+                        <th>İŞLEM TARİHİ</th>
+                        <th>TİP</th>
+                        <th>CARİ / MÜŞTERİ</th>
+                        <th>NOT / AÇIKLAMA</th>
+                        <th style="text-align: right;">ADET DEĞİŞİMİ</th>
+                    </tr>
+                </thead>
+                <tbody id="detay_tablo_body">
+                    {% for h in hareketler %}
+                    <tr>
+                        <td data-label="TARİH" class="text-muted" style="line-height: 1.4; text-align: left;">
+                            <div style="font-weight: 700; font-size: 13px; color: #1e293b;">
+                                {{ h.tarih.strftime('%d.%m.%Y') }}
+                            </div>
+                            <div style="font-size: 11px; font-weight: 600; color: #94a3b8; margin-top: 2px;">
+                                <i class="far fa-clock" style="font-size: 10px;"></i> {{ h.tarih.strftime('%H:%M') }}
+                            </div>
+                        </td>
+                        <td data-label="İŞLEM" style="text-align: left;">
+                            {% set p = h.islem_tipi.split(' | ') if h.islem_tipi and ' | ' in h.islem_tipi else [h.islem_tipi, '-', '-'] %}
+                            {% set islem_val = p[0] if p|length > 0 else 'DİĞER' %}
+                            {% set badge_class = 'type-in' if 'GİRİŞ' in islem_val else ('type-out' if 'ÇIKIŞ' in islem_val else 'type-edit') %}
+                            <span class="status-badge {{ badge_class }}">{{ islem_val }}</span>
+                        </td>
+                        <td data-label="Müşteri" style="text-align: left; vertical-align: middle;">
+                            <b style="color: #2473e0;">
+                                {% if 'ÇIKIŞ' in h.islem_tipi|upper %}
+                                    {{ h.musteri_ad or '-' }}
+                                {% else %}
+                                    {{ h.islem_nedeni or '-' }}
+                                {% endif %}
+                            </b>
+                        </td>
+                        <td data-label="Açıklama" style="text-align: left; vertical-align: middle; font-size: 12px; color: #64748b;">
+                            <div>{{ h.aciklama or '-' }}</div>
+                            {% if h.islem_yapan %}
+                                <div style="font-size: 9px; color: #94a3b8; margin-top: 3px;">
+                                    👤 {{ h.islem_yapan }}
+                                </div>
+                            {% endif %}
+                        </td>
+                        <td data-label="DEĞİŞİM" style="text-align: right; font-weight: 900; font-size: 1.1rem; color: {{ '#f43f5e' if h.miktar_degisimi < 0 else '#10b981' }}">
+                            {{ '+' if h.miktar_degisimi > 0 }}{{ h.miktar_degisimi }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div id="silme-modal" class="glass-overlay">
+    <div class="info-card" style="max-width: 400px; text-align: center; border-top: 10px solid var(--danger); margin-bottom: 0;">
+        <div style="font-size: 4rem; margin-bottom: 15px;">🚨</div>
+        <h2 style="font-weight: 900; color: #0f172a;">DİKKAT!</h2>
+        <p style="color: #64748b; font-weight: 500;">Bu ürünü silerseniz tüm stok hareketleri ve kayıtlar kalıcı olarak yok edilir. Onaylıyor musunuz?</p>
+        <div style="display: flex; gap: 15px; margin-top: 30px;">
+            <button onclick="islemIptal()" class="btn" style="flex:1; background: #f1f5f9; color: #475569; font-weight: 700; border-radius: 12px; border: none; padding: 12px;">VAZGEÇ</button>
+            <button onclick="islemOnaylaSil()" class="btn" style="flex:1; background: var(--danger); color: white; font-weight: 700; border-radius: 12px; border: none; padding: 12px;">SİL</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    $(document).ready(function() { 
+        if ($.fn.select2) {
+            $('#k').select2({ tags: true, width: '100%' });
+            $('#yer').select2({
+                tags: true, 
+                placeholder: "YER SEÇİN VEYA YAZIN",
+                allowClear: true,
+                width: '100%',
+                createTag: function (params) {
+                    var term = $.trim(params.term);
+                    return term === '' ? null : { id: term.toUpperCase(), text: term.toUpperCase(), newTag: true };
+                }
+            });
+        }
+    });
+
+    async function guncelle() {
+        const barkod = "{{ urun.barkod }}";
+        const eskiLot = "{{ urun.lot }}"; 
+        const yeniLot = document.getElementById('detay_lot').value; 
+        
+        const data = {
+            barkod: barkod,
+            isim: document.getElementById('detay_isim').value,
+            lot: yeniLot,
+            kategori_ad: document.getElementById('k').value,
+            yer: document.getElementById('yer').value,
+            miktar: parseInt("{{ urun.miktar }}"),
+            islem_nedeni: "BİLGİ GÜNCELLEME"
+        };
+
+        try {
+            const url = `/urun-guncelle/${barkod}?eski_lot=${encodeURIComponent(eskiLot)}`;
+            
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+
+            if(res.ok) {
+                bildirim("Başarılı! Yönlendiriliyor...", "success");
+                setTimeout(() => {
+                    window.location.href = `/urun-detay/${barkod}/${encodeURIComponent(yeniLot)}`;
+                }, 1000);
+            } else {
+                const errorData = await res.json();
+                bildirim("Hata: " + (errorData.detail || "Güncelleme yapılamadı"), "error");
+            }
+        } catch (e) {
+            console.error(e);
+            bildirim("Bağlantı hatası!", "error");
+        }
+    }
+
+    function urunuSilOnay() { 
+        document.getElementById('silme-modal').style.display = 'flex'; 
+    }
+
+    function islemIptal() { 
+        document.getElementById('silme-modal').style.display = 'none'; 
+    }
+
+    async function islemOnaylaSil() {
+        const barkod = document.getElementById('b').value;
+        islemIptal();
+        try {
+            const res = await fetch('/urunler/' + barkod, { 
+                method: 'DELETE'
+            });
+            if(res.ok) {
+                if (typeof bildirim === "function") {
+                    bildirim("ÜRÜN VE GEÇMİŞİ SİLİNDİ", "success");
+                }
+                setTimeout(() => { window.location.href = "/urun-listesi/"; }, 1000);
+            } else {
+                const err = await res.json();
+                alert(err.detail || "SİLME YETKİNİZ YOK VEYA BİR HATA OLUŞTU!");
+            }
+        } catch (e) {
+            alert("BAĞLANTI KOPUK!");
+        }
+    }
+
+    function filtreleDetay() {
+        let v = $('#ara_detay').val().toUpperCase();
+        $('#detay_tablo tbody tr').each(function() {
+            $(this).toggle($(this).text().toUpperCase().indexOf(v) > -1);
+        });
+    }
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/colresizable/1.6.0/colResizable-1.6.min.js"></script>
+<script>
+$(document).ready(function(){
+    $("table").colResizable({
+        liveDrag: true,
+        gripInnerHtml: "<div class='grip'></div>",
+        draggingClass: "dragging",
+        resizeMode: 'fit',
+        postbackSafe: true,
+        partialRefresh: true
+    });
+});
+</script>
+{% endblock %}
+
+
+

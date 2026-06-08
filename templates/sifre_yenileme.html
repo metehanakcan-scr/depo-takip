@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Depo Pro v3 | Şifre Yenileme</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-gradient: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+            --bg: #f1f5f9; 
+            --text: #1e293b;
+        }
+
+        * { 
+            box-sizing: border-box; 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            margin: 0; 
+            padding: 0; 
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body { 
+            background: var(--bg); 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            min-height: 100vh; 
+            padding: 20px; 
+        }
+
+        .login-card { 
+            background: #ffffff; 
+            width: 100%; 
+            max-width: 400px; 
+            padding: 40px; 
+            border-radius: 16px; 
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08); 
+            transition: transform 0.3s ease;
+        }
+
+        .login-card:hover { transform: translateY(-5px); }
+
+        .logo-area { 
+            font-size: 2.2rem; 
+            font-weight: 800; 
+            color: var(--text); 
+            margin-bottom: 8px; 
+            letter-spacing: -1.5px; 
+            text-align: center; 
+        }
+
+        .logo-area span { color: var(--primary); }
+
+        p { 
+            color: #64748b; 
+            font-size: 0.95rem; 
+            margin-bottom: 30px; 
+            text-align: center; 
+        }
+
+        .form-group { 
+            text-align: left; 
+            margin-bottom: 20px; 
+        }
+
+        label { 
+            display: block; 
+            font-size: 14px; 
+            font-weight: 600; 
+            color: #666; 
+            margin-bottom: 8px; 
+        }
+
+        /* Şifre alanı ve göz ikonunu sarmalayan yeni wrapper */
+        .password-wrapper {
+            position: relative;
+            width: 100%;
+        }
+
+        input { 
+            width: 100%; 
+            padding: 12px 16px; 
+            border: 2px solid #e2e8f0; 
+            border-radius: 8px; 
+            font-size: 16px; 
+            color: var(--text); 
+            background: #f8fafc; 
+            transition: all 0.3s ease; 
+            outline: none; 
+        }
+
+        /* Göz ikonunun inputun üzerine binmesini önleyen sağ boşluk */
+        .password-wrapper input {
+            padding-right: 45px;
+        }
+
+        input:focus { 
+            border-color: var(--primary); 
+            background: white; 
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15); 
+        }
+
+        /* 🚫 TARAYICININ YALANCI SOL GÖZÜNÜ KESİN SİLME KURALLARI */
+        input::-ms-reveal,
+        input::-ms-clear {
+            display: none !important;
+            width: 0 !important;
+            height: 0 !important;
+        }
+
+        input::-webkit-contacts-auto-fill-button,
+        input::-webkit-credentials-auto-fill-button {
+            visibility: hidden !important;
+            display: none !important;
+            pointer-events: none !important;
+        }
+
+        /* Her zaman sabit duracak modern özel göz ikonu stili */
+        .password-toggle-icon {
+            position: absolute;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: #a0aec0;
+            transition: color 0.2s ease;
+            z-index: 10;
+            font-size: 16px;
+        }
+
+        .password-toggle-icon:hover {
+            color: var(--primary);
+        }
+
+        .btn-login { 
+            width: 100%; 
+            padding: 14px; 
+            background: var(--primary-gradient); 
+            color: white; 
+            border: none; 
+            border-radius: 8px; 
+            font-size: 16px; 
+            font-weight: bold; 
+            cursor: pointer; 
+            margin-top: 10px; 
+            box-shadow: 0 4px 6px rgba(99, 102, 241, 0.2); 
+            transition: opacity 0.3s ease;
+        }
+
+        .btn-login:hover { opacity: 0.9; }
+        .btn-login:active { transform: scale(0.98); }
+        .btn-login:disabled { background: #cbd5e1; cursor: not-allowed; box-shadow: none; }
+
+        .register-link { text-align: center; margin-top: 24px; font-size: 14px; color: #718096; }
+        .register-link a { color: var(--primary); text-decoration: none; font-weight: bold; }
+        
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    </style>
+</head>
+<body>
+
+<div id="toast-container" style="position: fixed; top: 20px; right: 20px; z-index: 10001;"></div>
+
+<div class="login-card">
+    <div class="logo-area">🔒 ŞİFRE<span>Nİ SIFIRLA</span></div>
+    <p>Hesap kurtarma ve şifre yenileme</p>
+
+    {% if not request.query_params.get('kod_gonderildi') == 'True' %}
+    <form action="/sifre-yenileme/kod-gonder" method="POST" id="kod_formu" novalidate>
+        <div class="form-group">
+            <label>E-posta Adresi</label>
+            <input type="email" name="email" id="email_input" placeholder="Sisteme kayıtlı mail adresiniz" autocomplete="off" value="">
+        </div>
+        <button type="submit" id="submit_btn" class="btn-login">6 HANELİ KOD GÖNDER</button>
+    </form>
+    {% endif %}
+
+    {% if request.query_params.get('kod_gonderildi') == 'True' %}
+    <form action="/sifre-yenileme/onayla" method="post" autocomplete="new-password">
+        <input type="hidden" name="email" value="{{ request.query_params.get('email') }}">
+        
+        <div class="form-group">
+            <label>E-posta Adresi</label>
+            <input type="email" value="{{ request.query_params.get('email') }}" disabled style="background-color: #e2e8f0; color: #64748b; cursor: not-allowed;">
+        </div>
+
+        <div class="form-group">
+            <label>6 Haneli Doğrulama Kodu</label>
+            <input type="text" name="kod" id="kod_input" placeholder="6 Haneli Kod" maxlength="6" required autocomplete="new-password" style="text-align: center; font-weight: bold; letter-spacing: 5px;">
+        </div>
+
+        <div class="form-group">
+            <label>Yeni Güçlü Şifre</label>
+            <div class="password-wrapper">
+                <input type="password" name="yeni_sifre" id="sifre_input" placeholder="••••••••" required autocomplete="new-password">
+                <i class="fa-regular fa-eye password-toggle-icon" id="togglePassword"></i>
+            </div>
+        </div>
+
+        <button type="submit" class="btn-login">ŞİFREMİ GÜNCELLE</button>
+    </form>
+    {% endif %}
+
+    <div class="register-link">
+        Şifrenizi hatırladınız mı? <a href="/login">Giriş Yapın</a>
+    </div>
+</div>
+
+<script>
+    function bildirim(msg, type='success') {
+        const color = type === 'success' ? '#10b981' : '#ef4444';
+        const toast = document.createElement('div');
+        toast.style = `background:${color}; color:white; padding:12px 24px; border-radius:10px; margin-bottom:10px; font-weight:700; box-shadow:0 4px 12px rgba(0,0,0,0.15); animation: slideIn 0.3s ease-out; font-size: 14px;`;
+        toast.innerText = msg;
+        document.getElementById('toast-container').appendChild(toast);
+        setTimeout(() => toast.remove(), 4000);
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        
+        if (urlParams.get('hata')) {
+            bildirim("⚠️ " + decodeURIComponent(urlParams.get('hata')), "error");
+        }
+        
+        if (urlParams.get('mesaj')) {
+            bildirim("✨ " + decodeURIComponent(urlParams.get('mesaj')), "success");
+        }
+
+        // 2. Adım alanlarını tarayıcı zorlamasından temizleme
+        setTimeout(() => {
+            const kInput = document.getElementById('kod_input');
+            const sInput = document.getElementById('sifre_input');
+            if(kInput) kInput.value = '';
+            if(sInput) sInput.value = '';
+        }, 50);
+
+        // Göz ikonuna tıklanınca şifreyi göster/gizle tetikleyicisi
+        const togglePassword = document.querySelector("#togglePassword");
+        const passwordInput = document.querySelector("#sifre_input");
+
+        if (togglePassword && passwordInput) {
+            togglePassword.addEventListener("click", function () {
+                const type = passwordInput.getAttribute("type") === "password" ? "text" : "password";
+                passwordInput.setAttribute("type", type);
+                this.classList.toggle("fa-eye");
+                this.classList.toggle("fa-eye-slash");
+            });
+        }
+
+        // Form gönderilirken buton durumu kontrolü
+        const form = document.getElementById('kod_formu');
+        if(form) {
+            form.addEventListener('submit', (e) => {
+                const emailVal = document.getElementById('email_input').value.trim();
+                if(!emailVal) {
+                    e.preventDefault();
+                    bildirim("Lütfen e-posta adresinizi girin.", "error");
+                    return;
+                }
+                const btn = document.getElementById('submit_btn');
+                btn.disabled = true;
+                btn.innerText = "KOD GÖNDERİLİYOR...";
+            });
+        }
+    });
+</script>
+
+</body>
+</html>

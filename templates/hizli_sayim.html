@@ -1,0 +1,1090 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-9">
+            <div class="card shadow-sm border-0" style="border-radius: 20px; overflow: hidden;">
+                
+                <div class="card-header bg-white border-0 pt-4 px-4">
+                    <h5 class="fw-bold text-dark mb-0" style="white-space: nowrap;">
+                        <i class="fas fa-barcode me-2 text-primary"></i>HIZLI SAYIM
+                    </h5>
+
+                    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:nowrap; margin-top:15px;">
+
+                        <div style="display:flex; align-items:center; gap:10px;">
+
+                            <button 
+                                id="cameraToggle"
+                                style="
+                                    border:none;
+                                    background:#5c67f2;
+                                    color:white;
+                                    padding:10px 16px;
+                                    border-radius:10px;
+                                    font-weight:600;
+                                "
+                            >
+                                📷 Kamerayı Aç
+                            </button>
+
+                        </div>
+
+                        <a href="/api/sayim-indir"
+                           class="btn btn-success btn-sm px-3 d-flex align-items-center shadow-sm"
+                           style="
+                                border-radius:12px;
+                                background:#05cd99;
+                                border:none;
+                                height:40px;
+                                font-weight:600;
+                                text-decoration:none !important;
+                                color:white !important;
+                                white-space:nowrap;
+                           ">
+
+                            <i class="fas fa-file-excel me-2"></i>
+                            Sayım İndir
+                        </a>
+                    </div>
+                </div>
+
+                <div class="card-body px-4 pb-4" style="margin-top:20px">
+
+                    <!-- KAMERA -->
+                    <div id="camera-container"
+                        style="
+                            width:100%;
+                            max-width:340px;
+                            margin:20px auto;
+                            position:relative;
+                            display:none;
+                        ">
+
+                        <div id="reader"
+                            style="
+                                width:100%;
+                                border-radius:16px;
+                                overflow:hidden;
+                                border:2px solid #6366f1;
+                                background:#000;
+                            ">
+                        </div>
+
+
+                        <!-- FLASH -->
+                        <button 
+                            id="innerFlashBtn"
+                            onclick="toggleFlash()"
+                            style="
+                                display:none;
+                                position:absolute;
+                                bottom:10px;
+                                left:50%;
+                                transform:translateX(-50%);
+                                z-index:999;
+
+                                border:none;
+                                border-radius:999px;
+
+                                padding:8px 14px;
+
+                                background:rgba(0,0,0,.75);
+                                color:#fff;
+
+                                font-size:13px;
+                                font-weight:600;
+
+                                backdrop-filter:blur(6px);
+                            "
+                        >
+                            💡 Flash Aç
+                        </button>
+
+
+                        <!-- ZOOM -->
+                        <button 
+                            id="zoomBtn"
+                            onclick="zoomDegistir()"
+                            style="
+                                display:none;
+                                position:absolute;
+                                top:10px;
+                                right:10px;
+                                z-index:999;
+
+                                border:none;
+                                border-radius:999px;
+
+                                padding:8px 12px;
+
+                                background:rgba(0,0,0,.75);
+                                color:#fff;
+
+                                font-size:13px;
+                                font-weight:600;
+
+                                backdrop-filter:blur(6px);
+                            "
+                        >
+                            🔍 2x
+                        </button>
+
+                    </div>
+
+                    <form id="sayimForm">
+
+                        <div class="row g-3">
+
+                            <div class="col-12">
+
+                                <label class="form-label small fw-bold text-muted">
+                                    BARKOD
+                                </label>
+
+                                <div class="input-group">
+
+                                    <span class="input-group-text bg-light border-0">
+                                        <i class="fas fa-search text-muted"></i>
+                                    </span>
+
+                                    <input 
+                                        type="text"
+                                        id="barkod"
+                                        class="form-control form-control-lg bg-light border-0"
+                                        placeholder="Barkod okutun..."
+                                        required
+                                        autofocus
+                                    >
+                                </div>
+                            </div>
+
+                            <div class="col-12">
+
+                                <label class="form-label small fw-bold text-muted">
+                                    ÜRÜN ADI
+                                </label>
+
+                                <input 
+                                    type="text"
+                                    id="urun_adi"
+                                    class="form-control form-control-lg bg-light border-0"
+                                    readonly
+                                    placeholder="Ürün otomatik aranacak..."
+                                >
+
+                                <div id="yeniUrunNot"
+                                    class="text-danger small mt-1"
+                                    style="display:none;">
+
+                                    <i class="fas fa-exclamation-circle me-1"></i>
+                                    Bu barkod ilk kez sayılıyor, isim verebilirsiniz.
+                                </div>
+                            </div>
+
+                            <div style="
+                                display:grid;
+                                grid-template-columns:1fr 1fr;
+                                gap:12px;
+                                margin-bottom:15px;
+                            ">
+
+                                <div>
+
+                                    <label class="form-label small fw-bold text-muted">
+                                        VAR OLAN LOTLAR
+                                    </label>
+
+                                    <select
+                                        id="lot_select"
+                                        class="form-control"
+                                        style="
+                                            width:100%;
+                                            height:45px;
+                                            border-radius:10px;
+                                        "
+                                        onchange="lotSecildi(this.value)"
+                                    >
+
+                                        <option value="">
+                                            -- SEÇİN --
+                                        </option>
+                                    </select>
+                                </div>
+
+                                <div id="yeni_lot_div">
+
+                                    <label class="form-label small fw-bold text-muted">
+                                        YENİ LOT GİRİŞİ
+                                    </label>
+
+                                    <input
+                                        type="text"
+                                        id="lot_input"
+                                        class="form-control"
+                                        style="
+                                            height:45px;
+                                            border-radius:10px;
+                                        "
+                                        placeholder="Yeni lot yazın..."
+                                        enterkeyhint="next"
+                                    >
+                                </div>
+                            </div>
+
+                            <div class="col-12 col-md-6">
+
+                                <label class="form-label small fw-bold text-muted">
+                                    MİKTAR (Örn: 50 veya =12x6)
+                                </label>
+
+                                <input
+                                    type="text"
+                                    id="miktar"
+                                    inputmode="text"
+                                    class="form-control form-control-lg bg-light border-0"
+                                    placeholder="Miktar giriniz..."
+                                    required
+                                >
+                            </div>
+
+                            <div class="col-12 mt-4">
+
+                                <button
+                                    type="submit"
+                                    id="btnSubmit"
+                                    class="btn btn-primary w-100 py-3 fw-bold shadow-sm"
+                                    style="
+                                        border-radius:15px;
+                                        background:#5c67f2;
+                                        border:none;
+                                    "
+                                >
+                                    <i class="fas fa-save me-2"></i>
+                                    SAYIMI KAYDET
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-end mt-4 px-4">
+
+        <button
+            type="button"
+            class="btn btn-outline-danger btn-sm px-3 shadow-sm"
+            style="border-radius:10px;"
+            data-bs-toggle="modal"
+            data-bs-target="#sifreModal"
+        >
+
+            <i class="fas fa-trash-alt me-1"></i>
+            Sayımları Sıfırla
+        </button>
+    </div>
+
+    <div class="modal fade" id="sifreModal" tabindex="-1" aria-hidden="true">
+
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+
+            <div class="modal-content" style="border-radius:20px;">
+
+                <div class="modal-body p-4 text-center">
+
+                    <i class="fas fa-lock text-danger mb-3"
+                       style="font-size:2rem;"></i>
+
+                    <h6 class="fw-bold">
+                        GÜVENLİK ONAYI
+                    </h6>
+
+                    <input
+                        type="password"
+                        id="sifreInput"
+                        class="form-control text-center mb-3"
+                        placeholder="Şifre"
+                        style="border-radius:10px;"
+                    >
+
+                    <div id="modalUyari"
+                         class="text-danger small mb-3"
+                         style="display:none;">
+
+                        Hatalı şifre!
+                    </div>
+
+                    <div class="d-flex gap-2">
+
+                        <button
+                            type="button"
+                            class="btn btn-light w-50"
+                            data-bs-dismiss="modal"
+                            style="border-radius:10px;"
+                        >
+                            İptal
+                        </button>
+
+                        <button
+                            type="button"
+                            onclick="sayimlariSifirla()"
+                            class="btn btn-danger w-50"
+                            style="border-radius:10px;"
+                        >
+                            Sıfırla
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+<script src="https://unpkg.com/html5-qrcode"></script>
+
+<script>
+
+const barkodInput = document.getElementById('barkod');
+const urunInput = document.getElementById('urun_adi');
+const lotSelect = document.getElementById('lot_select');
+const lotInput = document.getElementById('lot_input');
+const miktarInput = document.getElementById('miktar');
+const yeniUrunNot = document.getElementById('yeniUrunNot');
+
+let html5QrCode = null;
+let currentTrack = null;
+let torchEnabled = false;
+let zoomLevel = 2;
+let focusInterval = null;
+
+
+
+barkodInput.addEventListener(
+    'change',
+    (e) => urunBilgisiGetir(e.target.value)
+);
+
+
+
+function lotSecildi(val) {
+
+    if (val !== "") {
+
+        lotInput.value = val;
+
+        miktarInput.focus();
+    }
+}
+
+
+
+/* =====================================================
+   KAMERA
+===================================================== */
+
+async function startCamera() {
+
+    const readerDiv =
+        document.getElementById('camera-container');
+
+    // açıksa kapat
+    if (html5QrCode) {
+
+        try {
+
+            if (focusInterval) {
+                clearInterval(focusInterval);
+            }
+
+            await html5QrCode.stop();
+            await html5QrCode.clear();
+
+        } catch (e) {}
+
+        html5QrCode = null;
+        currentTrack = null;
+
+        readerDiv.style.display = 'none';
+
+        document.getElementById("innerFlashBtn")
+            .style.display = "none";
+
+        document.getElementById("zoomBtn")
+            .style.display = "none";
+
+        return;
+    }
+
+    readerDiv.style.display = 'block';
+
+    setTimeout(async () => {
+
+        try {
+
+            html5QrCode =
+                new Html5Qrcode("reader");
+
+            const devices =
+                await Html5Qrcode.getCameras();
+
+            if (!devices || devices.length === 0) {
+
+                alert("Kamera bulunamadı");
+                return;
+            }
+
+            let cameraId = devices[0].id;
+
+            const backCamera =
+                devices.find(device => {
+
+                    const label =
+                        device.label.toLowerCase();
+
+                    return (
+                        label.includes("back") ||
+                        label.includes("rear") ||
+                        label.includes("environment")
+                    );
+                });
+
+            if (backCamera) {
+                cameraId = backCamera.id;
+            }
+
+            await html5QrCode.start(
+
+                cameraId,
+
+                {
+                    fps: 15,
+
+                    disableFlip: true,
+
+                    qrbox: function(
+                        viewfinderWidth,
+                        viewfinderHeight
+                    ) {
+
+                        let size = Math.min(
+                            viewfinderWidth,
+                            viewfinderHeight
+                        ) * 0.72;
+
+                        return {
+                            width: size,
+                            height: size
+                        };
+                    },
+
+                    aspectRatio: 1.777,
+
+                    videoConstraints: {
+
+                        facingMode: {
+                            ideal: "environment"
+                        },
+
+                        width: {
+                            ideal: 1920
+                        },
+
+                        height: {
+                            ideal: 1080
+                        },
+
+                        advanced: [
+
+                            {
+                                focusMode: "continuous"
+                            },
+
+                            {
+                                sharpness: 1
+                            },
+
+                            {
+                                contrast: 1
+                            }
+                        ]
+                    },
+
+                    experimentalFeatures: {
+                        useBarCodeDetectorIfSupported: true
+                    },
+
+                    formatsToSupport: [
+
+                        Html5QrcodeSupportedFormats.CODE_128,
+                        Html5QrcodeSupportedFormats.CODE_39,
+                        Html5QrcodeSupportedFormats.EAN_13,
+                        Html5QrcodeSupportedFormats.EAN_8,
+                        Html5QrcodeSupportedFormats.QR_CODE
+                    ]
+                },
+
+                async (decodedText) => {
+
+                    barkodInput.value = decodedText;
+
+                    urunBilgisiGetir(decodedText);
+
+                    if (navigator.vibrate) {
+                        navigator.vibrate(120);
+                    }
+
+                    try {
+
+                        if (focusInterval) {
+                            clearInterval(focusInterval);
+                        }
+
+                        await html5QrCode.stop();
+                        await html5QrCode.clear();
+
+                    } catch (e) {}
+
+                    html5QrCode = null;
+                    currentTrack = null;
+
+                    readerDiv.style.display = 'none';
+                },
+
+                (errorMessage) => {}
+            );
+
+            setTimeout(async () => {
+
+                try {
+
+                    const videoElement =
+                        document.querySelector("#reader video");
+
+                    if (!videoElement ||
+                        !videoElement.srcObject) {
+                        return;
+                    }
+
+                    const stream =
+                        videoElement.srcObject;
+
+                    const track =
+                        stream.getVideoTracks()[0];
+
+                    if (!track) {
+                        return;
+                    }
+
+                    currentTrack = track;
+
+                    const capabilities =
+                        track.getCapabilities();
+
+                    // autofocus
+                    if (capabilities.focusMode) {
+
+                        try {
+
+                            await track.applyConstraints({
+                                advanced: [
+                                    {
+                                        focusMode: "continuous"
+                                    }
+                                ]
+                            });
+
+                        } catch (e) {}
+                    }
+
+                    // DEFAULT 2X
+                    if (capabilities.zoom) {
+
+                        try {
+
+                            if (
+                                capabilities.zoom.max &&
+                                zoomLevel > capabilities.zoom.max
+                            ) {
+                                zoomLevel =
+                                    capabilities.zoom.max;
+                            }
+
+                            await track.applyConstraints({
+                                advanced: [
+                                    {
+                                        zoom: zoomLevel
+                                    }
+                                ]
+                            });
+
+                            // zoom sonrası focus reset
+                            await track.applyConstraints({
+                                advanced: [
+                                    {
+                                        focusMode: "continuous"
+                                    }
+                                ]
+                            });
+
+                            document
+                                .getElementById("zoomBtn")
+                                .innerHTML =
+                                `🔍 ${zoomLevel}x`;
+
+                        } catch (e) {}
+                    }
+
+                    // focus refresh
+                    focusInterval =
+                        setInterval(async () => {
+
+                            try {
+
+                                if (!currentTrack)
+                                    return;
+
+                                await currentTrack.applyConstraints({
+                                    advanced: [
+                                        {
+                                            focusMode: "continuous"
+                                        }
+                                    ]
+                                });
+
+                            } catch (e) {}
+
+                        }, 2500);
+
+                    // flash
+                    if (capabilities.torch) {
+
+                        document
+                            .getElementById("innerFlashBtn")
+                            .style.display = "flex";
+                    }
+
+                    // zoom
+                    if (capabilities.zoom) {
+
+                        document
+                            .getElementById("zoomBtn")
+                            .style.display = "block";
+                    }
+
+                } catch (err) {
+
+                    console.log(err);
+                }
+
+            }, 1000);
+
+        } catch (err) {
+
+            console.error(err);
+
+            alert("Kamera hatası: " + err);
+
+            readerDiv.style.display = 'none';
+
+            if (html5QrCode) {
+
+                try {
+                    await html5QrCode.stop();
+                    await html5QrCode.clear();
+                } catch (e) {}
+
+                html5QrCode = null;
+            }
+        }
+
+    }, 200);
+}
+
+
+
+async function toggleFlash() {
+
+    if (!currentTrack) return;
+
+    try {
+
+        torchEnabled = !torchEnabled;
+
+        await currentTrack.applyConstraints({
+            advanced: [
+                {
+                    torch: torchEnabled
+                }
+            ]
+        });
+
+        const btn =
+            document.getElementById("innerFlashBtn");
+
+        btn.innerHTML =
+            torchEnabled
+                ? "🔦 Flash Kapat"
+                : "💡 Flash Aç";
+
+    } catch (e) {
+
+        console.log("Torch desteklenmiyor", e);
+    }
+}
+
+
+
+async function zoomDegistir() {
+
+    if (!currentTrack) return;
+
+    try {
+
+        const capabilities =
+            currentTrack.getCapabilities();
+
+        if (!capabilities.zoom) return;
+
+        if (zoomLevel === 2) {
+            zoomLevel = 3;
+        }
+        else if (zoomLevel === 3) {
+            zoomLevel = 1;
+        }
+        else {
+            zoomLevel = 2;
+        }
+
+        if (
+            capabilities.zoom.max &&
+            zoomLevel > capabilities.zoom.max
+        ) {
+            zoomLevel = capabilities.zoom.max;
+        }
+
+        await currentTrack.applyConstraints({
+            advanced: [
+                {
+                    zoom: zoomLevel
+                }
+            ]
+        });
+
+        try {
+
+            await currentTrack.applyConstraints({
+                advanced: [
+                    {
+                        focusMode: "continuous"
+                    }
+                ]
+            });
+
+        } catch (e) {}
+
+        document.getElementById("zoomBtn")
+            .innerHTML = `🔍 ${zoomLevel}x`;
+
+    } catch (e) {
+
+        console.log("Zoom desteklenmiyor", e);
+    }
+}
+
+
+
+document.getElementById('cameraToggle')
+.addEventListener('click', startCamera);
+
+
+
+/* =====================================================
+   ÜRÜN BİLGİSİ
+===================================================== */
+
+async function urunBilgisiGetir(barcode) {
+
+    if (!barcode) return;
+
+    try {
+
+        const response =
+            await fetch(`/api/hizli-sayim-barkod/${barcode}`);
+
+        const data =
+            await response.json();
+
+        if (data.yeni_urun) {
+
+            urunInput.value = "";
+
+            urunInput.placeholder =
+                "YENİ ÜRÜN ADI GİRİNİZ...";
+
+            urunInput.readOnly = false;
+
+            urunInput.style.backgroundColor = "#fff";
+
+            if (yeniUrunNot)
+                yeniUrunNot.style.display = "block";
+
+        } else {
+
+            urunInput.value = data.isim;
+
+            urunInput.readOnly = true;
+
+            urunInput.style.backgroundColor = "#f8fafc";
+
+            if (yeniUrunNot)
+                yeniUrunNot.style.display = "none";
+        }
+
+        lotSelect.innerHTML =
+            '<option value="">-- SEÇİN --</option>';
+
+        if (data.liste && data.liste.length > 0) {
+
+            data.liste.forEach(item => {
+
+                let opt =
+                    document.createElement('option');
+
+                opt.value = item.lot;
+
+                opt.text =
+                    `${item.kaynak === "STOK" ? "[STOK]" : "[SAYIM]"} ${item.lot} (${item.miktar})`;
+
+                lotSelect.appendChild(opt);
+            });
+        }
+
+    } catch (err) {
+
+        console.error(err);
+    }
+}
+
+
+
+/* =====================================================
+   FORM GÖNDER
+===================================================== */
+
+document.getElementById('sayimForm').onsubmit =
+async (e) => {
+
+    e.preventDefault();
+
+    const btn =
+        document.getElementById('btnSubmit');
+
+    const barkod =
+        barkodInput.value;
+
+    const urun_adi =
+        urunInput.value;
+
+    let miktarRaw =
+        miktarInput.value.toString().trim();
+
+    let final_lot =
+        lotInput.value.trim() || lotSelect.value;
+
+    let hesaplanmisMiktar;
+
+    if (miktarRaw.startsWith('=')) {
+
+        try {
+
+            let islemMetni =
+                miktarRaw
+                .substring(1)
+                .toLowerCase()
+                .replace(/x/g, '*');
+
+            const temizIslem =
+                islemMetni.replace(
+                    /[^0-9+\-*/(). ]/g,
+                    ''
+                );
+
+            hesaplanmisMiktar =
+                Math.round(
+                    new Function(
+                        `return ${temizIslem}`
+                    )()
+                );
+
+            if (
+                isNaN(hesaplanmisMiktar) ||
+                !isFinite(hesaplanmisMiktar)
+            ) throw new Error();
+
+        } catch (err) {
+
+            alert("Hatalı işlem! Örn: =10x5");
+
+            return;
+        }
+
+    } else {
+
+        hesaplanmisMiktar =
+            Math.round(parseFloat(miktarRaw));
+    }
+
+    if (
+        !barkod ||
+        !final_lot ||
+        isNaN(hesaplanmisMiktar)
+    ) {
+
+        alert("Lütfen tüm alanları doldurun!");
+
+        return;
+    }
+
+    try {
+
+        btn.disabled = true;
+
+        btn.innerHTML = "GÖNDERİLİYOR...";
+
+        const response =
+            await fetch('/api/hizli-sayim-kaydet', {
+
+                method: 'POST',
+
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+
+                body: JSON.stringify({
+
+                    barkod,
+                    urun_adi,
+                    lot_no: final_lot,
+                    miktar: hesaplanmisMiktar
+                })
+            });
+
+        if (response.ok) {
+
+            btn.innerHTML =
+                `✅ KAYDEDİLDİ (${hesaplanmisMiktar})`;
+
+            btn.className =
+                "btn btn-success w-100 py-3 fw-bold";
+
+            setTimeout(() => {
+
+                document
+                    .getElementById('sayimForm')
+                    .reset();
+
+                lotSelect.innerHTML =
+                    '<option value="">-- SEÇİN --</option>';
+
+                btn.disabled = false;
+
+                btn.innerHTML =
+                    '<i class="fas fa-save me-2"></i>SAYIMI KAYDET';
+
+                btn.className =
+                    "btn btn-primary w-100 py-3 fw-bold shadow-sm";
+
+                barkodInput.focus();
+
+            }, 1000);
+        }
+
+    } catch (err) {
+
+        alert("Hata!");
+
+        btn.disabled = false;
+    }
+};
+
+
+
+/* =====================================================
+   SAYIMLARI SIFIRLA
+===================================================== */
+
+async function sayimlariSifirla() {
+
+    const sifre =
+        document.getElementById('sifreInput').value;
+
+    const response =
+        await fetch('/api/sayimlari-sifirla', {
+
+            method: 'POST',
+
+            headers: {
+                'Content-Type': 'application/json'
+            },
+
+            body: JSON.stringify({ sifre })
+        });
+
+    const result =
+        await response.json();
+
+    if (result.status === "ok") {
+
+        location.reload();
+
+    } else {
+
+        document.getElementById('modalUyari')
+            .style.display = "block";
+    }
+}
+
+
+
+/* =====================================================
+   VIDEO STYLE
+===================================================== */
+
+const style =
+    document.createElement('style');
+
+style.innerHTML = `
+
+#reader video{
+    width:100% !important;
+    height:auto !important;
+    object-fit:cover;
+    border-radius:14px;
+
+    transform:translateZ(0);
+    backface-visibility:hidden;
+}
+
+@media (max-width:768px){
+
+    #camera-container{
+        max-width:300px !important;
+    }
+
+    #reader video{
+        max-height:320px !important;
+    }
+}
+
+`;
+
+document.head.appendChild(style);
+
+</script>
+
+{% endblock %}

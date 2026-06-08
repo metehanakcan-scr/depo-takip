@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+anahtar.json
+.env
+*.db
+instance/
+venv/
+.vscode/

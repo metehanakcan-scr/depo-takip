@@ -1,0 +1,36 @@
+@media (max-width: 768px) {
+    /* 1. Sidebar'ı gizle ve mobil menü yap */
+    .sidebar { transform: translateX(-240px); }
+    .sidebar.active { transform: translateX(0); }
+    .main-content { margin-left: 0; width: 100%; padding: 20px 10px; }
+    
+    /* 2. Menü butonunu göster */
+    .mobile-nav-toggle {
+        display: block !important;
+        position: fixed;
+        bottom: 20px; right: 20px;
+        width: 60px; height: 60px;
+        background: #6366f1;
+        color: white; border: none; border-radius: 50%;
+        font-size: 24px; z-index: 2000;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    }
+
+    /* 3. Input ve Butonları DEV YAP (Parmak Dostu) */
+    input, select, .btn, .select2-container .select2-selection--single {
+        height: 55px !important;
+        font-size: 16px !important; /* Klavye zoom yapmasın diye 16px */
+    }
+
+    /* 4. Klavye açılınca ekrana sığması için kartları daralt */
+    .card { padding: 15px; border-radius: 12px; }
+
+    /* 5. Mobilde her şey alt alta (Grid iptal) */
+    div[style*="grid-template-columns"] {
+        grid-template-columns: 1fr !important;
+        gap: 10px !important;
+    }
+
+    /* 6. Arka plan karartma */
+    .overlay.active { display: block !important; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 900; }
+}

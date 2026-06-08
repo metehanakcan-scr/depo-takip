@@ -1,0 +1,516 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div id="toast-container" style="position: fixed; top: 20px; right: 20px; z-index: 10001;"></div>
+
+<div class="container-fluid py-4" style="font-family: 'Inter', sans-serif; background-color: #f8fafc; min-height: 100vh;">
+    
+    <div style="margin-bottom: 20px;">
+        <h2 style="margin: 0; font-size: 1.4rem; font-weight: 800; color: #1e293b; letter-spacing: -0.5px;">⚙️ SİSTEM YÖNETİMİ</h2>
+        <p style="color: #64748b; font-size: 13px; margin-top: 5px;">Tüm yapılandırmaları ve toplu işlemleri buradan yönetebilirsiniz.</p>
+    </div>
+
+    <div class="tab-nav-wrapper">
+        <button onclick="tabDegistir('yetki')" id="btn-yetki" class="tab-btn active">
+            <i class="fas fa-user-shield"></i> YETKİ & PERSONEL
+        </button>
+        <button onclick="tabDegistir('tanimlar')" id="btn-tanimlar" class="tab-btn">
+            <i class="fas fa-tags"></i> TANIMLAMALAR
+        </button>
+        <button onclick="tabDegistir('toplu_edit')" id="btn-toplu_edit" class="tab-btn text-primary">
+            <i class="fas fa-edit"></i> TOPLU GÜNCELLE
+        </button>
+        <button onclick="tabDegistir('excel')" id="btn-excel" class="tab-btn text-success">
+            <i class="fas fa-file-excel"></i> EXCEL AKTARIM
+        </button>
+        <button onclick="tabDegistir('sistem')" id="btn-sistem" class="tab-btn text-danger">
+            <i class="fas fa-power-off"></i> SİSTEM
+        </button>
+    </div>
+
+    <div id="tab-yetki" class="tab-content">
+        <div class="card border-0 shadow-sm mb-4" style="border-radius: 16px;">
+            <div style="padding: 20px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <h3 style="margin: 0; font-size: 1rem; color: #4f46e5; font-weight: 800;"><i class="fas fa-chess-king me-2"></i>ROL YETKİ MATRİSİ</h3>
+                <form onsubmit="rolAdd(event)" style="display: flex; gap: 5px;">
+                    <input type="text" id="r_input" placeholder="Yeni Rol..." required style="height: 35px; border-radius: 8px; border: 1px solid #cbd5e1; padding: 0 10px; font-size: 12px; width: 150px;">
+                    <button type="submit" class="btn btn-primary" style="height: 35px; border-radius: 8px; font-size: 12px; font-weight: bold; background: #4f46e5; border: none; cursor:pointer;">EKLE</button>
+                </form>
+            </div>
+            <div style="overflow-x: auto;">
+                <table class="custom-admin-table" style="width: 100%; border-collapse: collapse;">
+                    <thead style="background: #f8fafc; font-size: 11px; color: #64748b;">
+                        <tr>
+                            <th style="padding: 15px; text-align: left; padding-left: 20px;">ROL ADI</th>
+                            <th>GİRİŞ</th><th>ÇIKIŞ</th><th>DÜZENLE</th><th>SİLME</th><th>YÖNETİM</th><th>LOGLAR</th><th>İŞLEM</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in roller %}
+                        <tr style="border-bottom: 1px solid #f1f5f9;">
+                            <td style="padding: 12px 20px;"><span class="badge-role">{{ r.ad }}</span></td>
+                            <td align="center"><input type="checkbox" class="modern-check" {{ 'checked' if r.can_add_stock }} onchange="ajaxUpdate('rol-yetki-guncelle/{{r.id}}', {alan:'can_add_stock', deger:this.checked}, '{{r.ad}}')"></td>
+                            <td align="center"><input type="checkbox" class="modern-check" {{ 'checked' if r.can_exit_stock }} onchange="ajaxUpdate('rol-yetki-guncelle/{{r.id}}', {alan:'can_exit_stock', deger:this.checked}, '{{r.ad}}')"></td>
+                            <td align="center"><input type="checkbox" class="modern-check" {{ 'checked' if r.can_edit_product }} onchange="ajaxUpdate('rol-yetki-guncelle/{{r.id}}', {alan:'can_edit_product', deger:this.checked}, '{{r.ad}}')"></td>
+                            <td align="center"><input type="checkbox" class="modern-check" {{ 'checked' if r.can_delete }} onchange="ajaxUpdate('rol-yetki-guncelle/{{r.id}}', {alan:'can_delete', deger:this.checked}, '{{r.ad}}')"></td>
+                            <td align="center"><input type="checkbox" class="modern-check" {{ 'checked' if r.can_manage_users }} onchange="ajaxUpdate('rol-yetki-guncelle/{{r.id}}', {alan:'can_manage_users', deger:this.checked}, '{{r.ad}}')"></td>
+                            <td align="center"><input type="checkbox" class="modern-check" {{ 'checked' if r.can_see_logs }} onchange="ajaxUpdate('rol-yetki-guncelle/{{r.id}}', {alan:'can_see_logs', deger:this.checked}, '{{r.ad}}')"></td>
+                            <td align="center">
+                                {% if r.ad != 'ADMIN' %}
+                                <button onclick="openRolDel({{r.id}}, '{{r.ad}}')" style="background: none; border: none; cursor: pointer;"><img src="https://cdn-icons-png.flaticon.com/512/6861/6861362.png" width="16"></button>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm" style="border-radius: 16px;">
+            <div style="padding: 20px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin: 0; font-size: 1rem; color: #4f46e5; font-weight: 800;"><i class="fas fa-users-cog me-2"></i>PERSONEL LİSTESİ</h3>
+                <button onclick="mShow('user-modal')" class="btn btn-primary" style="height: 35px; border-radius: 8px; font-size: 12px; font-weight: bold; background: #4f46e5; border: none; cursor:pointer;">+ YENİ PERSONEL</button>
+            </div>
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead style="background: #f8fafc; font-size: 11px; color: #64748b;">
+                        <tr>
+                            <th style="padding: 15px; text-align: left; padding-left: 20px;">PROFİL</th>
+                            <th style="padding: 15px; text-align: left; padding-left: 20px;">MAİL ADRESİ</th>
+                            <th style="padding: 15px; text-align: left;">KULLANICI ADI</th>
+                            <th style="padding: 15px; text-align: left;">ATANAN ROL</th>
+                            <th style="padding: 15px; text-align: right; padding-right: 20px;">İŞLEMLER</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for k in kullanicilar %}
+                        <tr style="border-bottom: 1px solid #f1f5f9;">
+                            
+                            <td style="padding: 10px 20px;"><div class="avatar-box">{{ k.kullanici_adi[0].upper() if k.kullanici_adi else '?' }}</div></td>
+                            
+                            <td style="padding: 10px 15px; font-weight: bold; font-size: 13px; color: #1e293b; text-transform: none !important;">{{ k.email }}</td>
+                            
+                            <td style="padding: 10px 15px; font-weight: bold; font-size: 13px; color: #1e293b; text-transform: uppercase !important;">{{ k.kullanici_adi }}</td>
+                            
+                            <td style="padding: 10px 15px;">
+                                {% if k.kullanici_adi == request.state.user.kullanici_adi or (k.rol_id == 1 and request.state.user.kullanici_adi != k.kullanici_adi) %}
+                                    <span class="badge-role" style="background: #f1f5f9; color: #64748b; padding: 6px 12px; border-radius: 8px;">KİLİTLİ</span>
+                                {% else %}
+                                    <select onchange="ajaxUpdate('kullanici-rol-ata/{{k.id}}', {rol_id:this.value}, '{{ k.kullanici_adi }}')" style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 5px 10px; font-size: 12px; background: #f8fafc; outline: none; cursor: pointer;">
+                                        {% for r in roller %}<option value="{{ r.id }}" {{ 'selected' if k.rol_id == r.id }}>{{ r.ad }}</option>{% endfor %}
+                                    </select>
+                                {% endif %}
+                            </td>
+                            <td style="padding: 10px 20px; text-align: right;">
+                                {% if k.rol_id == 1 and k.kullanici_adi != request.state.user.kullanici_adi %}
+                                    <span style="color: #cbd5e1; font-size: 12px; font-weight: bold;"><i class="fas fa-lock"></i> KORUMALI</span>
+                                {% else %}
+                                    <button onclick="openPass({{k.id}}, '{{k.kullanici_adi}}', '{{k.email}}')", style="background: none; border: none; cursor: pointer; margin-right: 10px;">
+                                        <img src="/static/icons/pencil.png" width="18">
+                                    </button>
+                                    <button onclick="openDelete({{k.id}}, '{{k.kullanici_adi}}')" style="background: none; border: none; cursor: pointer;"><img src="https://cdn-icons-png.flaticon.com/512/6861/6861362.png" width="18"></button>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-toplu_edit" class="tab-content" style="display: none;">
+        <div class="card shadow-sm border-0" style="border-top: 5px solid #4f46e5; padding: 30px; border-radius: 20px;">
+            <div style="text-align: center; margin-bottom: 30px;">
+                <div style="font-size: 50px; color: #4f46e5; margin-bottom: 15px;"><i class="fas fa-edit"></i></div>
+                <h4>Toplu Veri Güncelleme Sistemi</h4>
+                <p class="text-muted">Mevcut stoklarınızı Excel ile topluca düzenleyebilirsiniz.</p>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div style="background: #f8fafc; padding: 20px; border-radius: 15px; border: 2px dashed #e2e8f0; text-align: center;">
+                    <h6 class="fw-bold">1. ADIM: LİSTEYİ İNDİR</h6>
+                    <a href="/stok-guncelleme-sablonu?tip=sablon" class="btn btn-primary w-100 py-2" style="border-radius: 10px;">
+                        <i class="fas fa-download me-2"></i>GÜNCEL LİSTEYİ İNDİR
+                    </a>
+                </div>
+                <div style="background: #f8fafc; padding: 20px; border-radius: 15px; border: 2px dashed #e2e8f0; text-align: center;">
+                    <h6 class="fw-bold">2. ADIM: DÜZENLE VE YÜKLE</h6>
+                    <input type="file" id="guncelle_input" accept=".xlsx" style="display: none;">
+                    <button onclick="document.getElementById('guncelle_input').click()" class="btn btn-success w-100 py-2" style="border-radius: 10px;">
+                        <i class="fas fa-upload me-2"></i>EXCELİ SEÇ VE GÜNCELLE
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-tanimlar" class="tab-content" style="display: none;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px;">
+            <div class="card shadow-sm border-0" style="border-top: 4px solid #eab308; padding: 20px; border-radius: 16px;">
+                <h3 style="margin-top: 0; font-size: 1rem; margin-bottom: 15px; font-weight: 800;"><i class="fas fa-folder text-warning me-2"></i>KATEGORİLER</h3>
+                <form onsubmit="kategoriEkle(event)" style="display: flex; gap: 5px; margin-bottom: 15px;">
+                    <input type="text" id="kat_input" placeholder="Yeni Kategori..." required style="flex: 1; height: 36px; font-size: 12px; padding: 0 10px; border-radius: 8px; border: 1px solid #e2e8f0; background: #f8fafc;">
+                    <button type="submit" style="background: #1e293b; color: white; height: 36px; padding: 0 15px; font-size: 11px; font-weight: bold; border: none; border-radius: 8px; cursor: pointer;">EKLE</button>
+                </form>
+                <div style="max-height: 350px; overflow-y: auto;">
+                    <table style="width: 100%; border-spacing: 0 6px; border-collapse: separate;">
+                        {% for k in kategoriler %}
+                        <tr>
+                            <td style="padding: 10px 15px; background: #f8fafc; border: 1px solid #f1f5f9; border-radius: 10px;">
+                                <b style="font-size: 12px; color: #475569;">{{ k.ad }}</b>
+                                <button onclick="kategoriSil({{ k.id }})" style="float:right; border:none; background:none; cursor:pointer;"><img src="https://cdn-icons-png.flaticon.com/512/6861/6861362.png" width="14"></button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </table>
+                </div>
+            </div>
+            <div class="card shadow-sm border-0" style="border-top: 4px solid #3b82f6; padding: 20px; border-radius: 16px;">
+                <h3 style="margin-top: 0; font-size: 1rem; margin-bottom: 15px; font-weight: 800;"><i class="fas fa-handshake text-primary me-2"></i>MÜŞTERİLER</h3>
+                <form onsubmit="musteriEkle(event)" style="display: flex; gap: 5px; margin-bottom: 15px;">
+                    <input type="text" id="mus_input" placeholder="Müşteri Adı..." required style="flex: 1; height: 36px; font-size: 12px; padding: 0 10px; border-radius: 8px; border: 1px solid #e2e8f0; background: #f8fafc;">
+                    <button type="submit" style="background: #3b82f6; color: white; height: 36px; padding: 0 15px; font-size: 11px; font-weight: bold; border: none; border-radius: 8px; cursor: pointer;">EKLE</button>
+                </form>
+                <div style="max-height: 350px; overflow-y: auto;">
+                    <table style="width: 100%; border-spacing: 0 6px; border-collapse: separate;">
+                        {% for m in musteriler %}
+                        <tr>
+                            <td style="padding: 10px 15px; background: #f0f9ff; border: 1px solid #e0f2fe; border-radius: 10px;">
+                                <b style="font-size: 12px; color: #0369a1;">{{ m.ad }}</b>
+                                <button onclick="musteriSil({{ m.id }})" style="float:right; border:none; background:none; cursor:pointer;"><img src="https://cdn-icons-png.flaticon.com/512/6861/6861362.png" width="14"></button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </table>
+                </div>
+            </div>
+            <div class="card shadow-sm border-0" style="border-top: 4px solid #ef4444; padding: 20px; border-radius: 16px;">
+                <h3 style="margin-top: 0; font-size: 1rem; margin-bottom: 15px; font-weight: 800;"><i class="fas fa-map-marker-alt text-danger me-2"></i>RAF YERLERİ</h3>
+                <form onsubmit="rafEkle(event)" style="display: flex; gap: 5px; margin-bottom: 15px;">
+                    <input type="text" id="raf_input" placeholder="Raf Kodu..." required style="flex: 1; height: 36px; font-size: 12px; padding: 0 10px; border-radius: 8px; border: 1px solid #e2e8f0; background: #f8fafc;">
+                    <button type="submit" style="background: #ef4444; color: white; height: 36px; padding: 0 15px; font-size: 11px; font-weight: bold; border: none; border-radius: 8px; cursor: pointer;">EKLE</button>
+                </form>
+                <div style="max-height: 350px; overflow-y: auto;">
+                    <table style="width: 100%; border-spacing: 0 6px; border-collapse: separate;">
+                        {% for r in yerler %}
+                        <tr>
+                            <td style="padding: 10px 15px; background: #fef2f2; border: 1px solid #fee2e2; border-radius: 10px;">
+                                <b style="font-size: 12px; color: #b91c1c;">{{ r.ad }}</b>
+                                <button onclick="rafSil({{ r.id }})" style="float:right; border:none; background:none; cursor:pointer;"><img src="https://cdn-icons-png.flaticon.com/512/6861/6861362.png" width="14"></button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-excel" class="tab-content" style="display: none;">
+        <div style="display: grid; grid-template-columns: 1.6fr 1fr; gap: 30px; align-items: stretch;">
+            <div class="card border-0 shadow-sm" style="border-top: 5px solid #10b981; border-radius: 24px; padding: 40px; background: white;">
+                <div style="text-align: center;">
+                    <div style="font-size: 60px; color: #10b981; margin-bottom: 20px;"><i class="fas fa-cloud-upload-alt"></i></div>
+                    <h5>Toplu Yeni Ürün Yükleme</h5>
+                    <p class="text-muted">Yeni ürünleri sisteme topluca aktarın.</p>
+                </div>
+                <div id="drop_zone" onclick="document.getElementById('excel_input').click()" style="border: 2px dashed #10b981; padding: 40px; border-radius: 20px; text-align: center; background: #f9fafb; cursor: pointer;">
+                    <input type="file" id="excel_input" accept=".xlsx" style="display: none;">
+                    <span id="dosya_adi_text" style="font-weight: bold; color: #059669;">DOSYA SEÇİN VEYA SÜRÜKLEYİN</span>
+                </div>
+                <button onclick="excelYukle()" id="yukle_btn" class="btn btn-success w-100 mt-4 py-3" style="display: none; border-radius: 15px; font-weight: 800;">🚀 AKTARIMI BAŞLAT</button>
+                <div class="mt-4">
+                    <a href="/excel-sablonu-indir" class="btn btn-outline-success w-100 py-3" style="border-radius: 15px; text-decoration: none; font-weight: bold;">
+                        <i class="fas fa-file-download me-2"></i>Excel Şablonunu İndir
+                    </a>
+                </div>
+            </div>
+            <div class="card border-0 shadow-sm p-4" style="background: #f8fafc; border-radius: 24px;">
+                <h6 class="fw-bold"><i class="fas fa-info-circle me-2 text-primary"></i>Kılavuz</h6>
+                <p class="small text-muted">Barkod, İsim, Lot ve Miktar alanları zorunludur. Sistemdeki mevcut kategori ve raf isimlerini kullanmaya dikkat edin.</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-sistem" class="tab-content" style="display: none;">
+        <div class="card shadow-sm" style="border-top: 5px solid #dc2626; background: #fff1f2; padding: 30px; border-radius: 16px; text-align: center;">
+            <h3 style="color: #dc2626; font-weight: 800;">🚨 SİSTEMİ SIFIRLA</h3>
+            <p>Tüm stok verileri silinecektir. Geri dönüşü yoktur!</p>
+            <div style="display: flex; gap: 10px; justify-content: center; margin-top: 20px;">
+                <input type="password" id="sifre_onay" placeholder="Güvenlik Şifresi" style="padding: 10px; border-radius: 10px; border: 1px solid #fca5a5;">
+                <button onclick="modernSifirlaOnay()" class="btn btn-danger" style="font-weight: bold;">SIFIRLA</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="rapor-modal" style="display:none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100000; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
+    <div class="card" style="width: 90%; max-width: 600px; padding: 25px; border-radius: 20px; background: white; max-height: 80vh; display: flex; flex-direction: column;">
+        <h4 style="border-bottom: 2px solid #f1f5f9; padding-bottom: 10px; font-weight: 800;"><i class="fas fa-chart-line text-success me-2"></i>İşlem Raporu</h4>
+        <div id="rapor-icerik" style="overflow-y: auto; flex: 1; margin: 15px 0; font-size: 14px; color: #475569;"></div>
+        <button onclick="location.reload()" class="btn btn-primary w-100 py-3" style="border-radius: 12px; font-weight: bold;">ANLADIM, SAYFAYI YENİLE</button>
+    </div>
+</div>
+
+<div id="user-modal" style="display:none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100000; justify-content: center; align-items: center;">
+    <div class="card" style="width: 350px; padding: 25px; border-radius: 20px; text-align: center; background: white;">
+        <h4 class="fw-bold mb-4">👤 Yeni Personel</h4>
+        <input type="text" id="add_email" placeholder="Mail Adresi" class="form-control mb-3" style="text-transform: none;" autocomplete="off">
+        <input type="text" id="add_u" placeholder="Kullanıcı Adı" class="form-control mb-3" style="text-transform: uppercase;" oninput="this.value = this.value.toUpperCase();" autocomplete="off">
+        <input type="password" id="add_p" placeholder="Şifre" class="form-control mb-4">
+        <div style="display: flex; gap: 10px;">
+            <button onclick="userKaydet()" class="btn btn-primary flex-fill">KAYDET</button>
+            <button onclick="mHide('user-modal')" class="btn btn-light flex-fill">İPTAL</button>
+        </div>
+    </div>
+</div>
+
+<div id="pass-modal" style="display:none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100000; justify-content: center; align-items: center;">
+    <div class="card" style="width: 350px; padding: 25px; border-radius: 20px; text-align: center; background: white;">
+        <h4 class="fw-bold mb-2">👤 Personel Düzenle</h4>
+        <p id="p_user_name_text" class="small text-muted mb-4"></p>
+        <input type="hidden" id="p_uid">
+        
+        <label style="display:block; text-align:left; font-size:11px; font-weight:800; color:#475569; margin-bottom:5px;">E-POSTA ADRESİ</label>
+        <input type="text" id="p_email" placeholder="Yeni E-posta" class="form-control mb-3" style="text-transform: none;" autocomplete="off">
+        
+        <label style="display:block; text-align:left; font-size:11px; font-weight:800; color:#475569; margin-bottom:5px;">KULLANICI ADI</label>
+        <input type="text" id="p_username" placeholder="Yeni Kullanıcı Adı" class="form-control mb-3" style="text-transform: uppercase;" oninput="this.value = this.value.toUpperCase();" autocomplete="off">
+        
+        <label style="display:block; text-align:left; font-size:11px; font-weight:800; color:#475569; margin-bottom:5px;">YENİ ŞİFRE (OPSİYONEL)</label>
+        <input type="password" id="p_new" placeholder="Değiştirmek istemiyorsanız boş bırakın" class="form-control mb-4" style="font-size: 13px;">
+        
+        <div style="display: flex; gap: 10px;">
+            <button onclick="passUpdate()" class="btn btn-warning flex-fill text-white fw-bold">GÜNCELLE</button>
+            <button onclick="mHide('pass-modal')" class="btn btn-light flex-fill">İPTAL</button>
+        </div>
+    </div>
+</div>
+
+<div id="yonetim-modal" style="display:none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 99999; justify-content: center; align-items: center;">
+    <div class="card" style="width: 350px; padding: 25px; border-radius: 20px; text-align: center; border-top: 5px solid #ef4444; background: white;">
+        <h4 class="fw-bold mb-2">EMİN MİSİNİZ?</h4>
+        <p id="modal-metin" class="small text-muted mb-4"></p>
+        <div style="display: flex; gap: 10px;">
+            <button id="modal-onay-btn" class="btn btn-danger flex-fill fw-bold">SİL</button>
+            <button onclick="modalKapat()" class="btn btn-light flex-fill">İPTAL</button>
+        </div>
+    </div>
+</div>
+
+<style>
+    .tab-nav-wrapper { display: flex; overflow-x: auto; white-space: nowrap; gap: 8px; padding: 8px; background: #e2e8f0; border-radius: 14px; margin-bottom: 25px; scrollbar-width: none; }
+    .tab-nav-wrapper::-webkit-scrollbar { display: none; }
+    .tab-btn { background: transparent; border: none; padding: 10px 20px; cursor: pointer; font-weight: 700; color: #64748b; border-radius: 10px; font-size: 12px; transition: 0.2s; white-space: nowrap; display: inline-flex; align-items: center; gap: 8px; }
+    .tab-btn.active { background: white; color: #4f46e5; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+    .badge-role { background: #eef2ff; color: #4f46e5; padding: 5px 12px; border-radius: 8px; font-weight: 800; font-size: 11px; }
+    .avatar-box { width: 35px; height: 35px; background: #4f46e5; color: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 800; }
+    .modern-check { width: 1.2rem; height: 1.2rem; cursor: pointer; }
+</style>
+
+<script>
+    // SEKME KONTROLÜ
+    document.addEventListener("DOMContentLoaded", () => {
+        const activeTab = localStorage.getItem('activeAdminTab') || 'yetki';
+        tabDegistir(activeTab);
+    });
+
+    function tabDegistir(id) {
+        document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+        const targetTab = document.getElementById('tab-' + id);
+        const targetBtn = document.getElementById('btn-' + id);
+        if (targetTab && targetBtn) {
+            targetTab.style.display = 'block';
+            targetBtn.classList.add('active');
+            localStorage.setItem('activeAdminTab', id);
+        }
+    }
+
+    const mShow = (id) => document.getElementById(id).style.display = 'flex';
+    const mHide = (id) => document.getElementById(id).style.display = 'none';
+    function modalKapat() { mHide('yonetim-modal'); mHide('user-modal'); mHide('pass-modal'); }
+
+    let aktifUrl = "";
+    function kategoriSil(id) { aktifUrl = `/kategori-sil/${id}`; tetikleSilModal("Kategori"); }
+    function musteriSil(id) { aktifUrl = `/musteri-sil/${id}`; tetikleSilModal("Müşteri"); }
+    function rafSil(id) { aktifUrl = `/yer-sil/${id}`; tetikleSilModal("Raf"); }
+    function openDelete(id, isim) { aktifUrl = `/kullanici-sil/${id}`; tetikleSilModal(isim); }
+    function openRolDel(id, isim) { aktifUrl = `/rol-sil/${id}`; tetikleSilModal(isim); }
+
+    function tetikleSilModal(msg) {
+        document.getElementById('modal-metin').innerText = msg + " silinecek. Onaylıyor musunuz?";
+        document.getElementById('modal-onay-btn').onclick = islemYap;
+        mShow('yonetim-modal');
+    }
+
+    async function islemYap() {
+        modalKapat();
+        try {
+            const res = await fetch(aktifUrl, { method: 'DELETE' });
+            if(res.ok) { bildirim("Silindi"); setTimeout(()=>location.reload(), 800); }
+            else { const err = await res.json(); bildirim(err.detail || "Hata", "error"); }
+        } catch(e) { bildirim("Bağlantı Hatası", "error"); }
+    }
+
+    async function userKaydet() {
+        const eml = document.getElementById('add_email').value;
+        const un = document.getElementById('add_u').value.trim().toUpperCase(); // Büyük harf garantisi
+        const ps = document.getElementById('add_p').value;
+        if(!un || !ps) return bildirim("Eksik bilgi!", "error");
+        const res = await fetch('/kullanici-ekle/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({email: eml, kullanici_adi: un, sifre: ps})
+        });
+        if(res.ok) location.reload(); else bildirim("Hata!", "error");
+    }
+
+    function openPass(id, isim, email) {
+        document.getElementById('p_uid').value = id;
+        document.getElementById('p_user_name_text').innerText = isim + " personelinin bilgilerini düzenleyin.";
+        document.getElementById('p_username').value = isim;
+        document.getElementById('p_email').value = email;
+        document.getElementById('p_new').value = ""; 
+        mShow('pass-modal');
+    }
+
+    async function passUpdate() {
+        const id = document.getElementById('p_uid').value;
+        const email = document.getElementById('p_email').value.trim();
+        const username = document.getElementById('p_username').value.trim().toUpperCase(); 
+        const pass = document.getElementById('p_new').value;
+        
+        if(!email || !username) return bildirim("E-posta ve Kullanıcı adı boş bırakılamaz!", "error");
+        
+        const res = await fetch(`/kullanici-sifre-admin-guncelle/${id}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                email: email,
+                kullanici_adi: username,
+                sifre: pass
+            })
+        });
+        
+        if(res.ok) { 
+            bildirim("Personel bilgileri güncellendi"); 
+            mHide('pass-modal'); 
+            setTimeout(() => location.reload(), 800);
+        } else {
+            const err = await res.json();
+            bildirim(err.detail || "Güncelleme başarısız!", "error");
+        }
+    }
+
+    async function rolAdd(e) {
+        e.preventDefault(); 
+        const rolAdInput = document.getElementById('r_input');
+        const rolAdi = rolAdInput.value.trim().toUpperCase();
+
+        if (!rolAdi) return;
+
+        try {
+            const res = await fetch('/rol-ekle/', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: `ad=${encodeURIComponent(rolAdi)}`
+            });
+
+            if (res.ok) {
+                bildirim("Yeni rol eklendi: " + rolAdi, "success");
+                rolAdInput.value = ""; 
+                setTimeout(() => location.reload(), 800);
+            } else {
+                const err = await res.json();
+                bildirim(err.detail || "Rol eklenemedi!", "error");
+            }
+        } catch (e) {
+            bildirim("Sunucu bağlantı hatası!", "error");
+        }
+    }
+
+    async function ajaxUpdate(url, d, n) {
+        const res = await fetch(`/${url}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(d)
+        });
+        if(res.ok) bildirim(n + " yetkisi güncellendi");
+    }
+
+    async function excelYukle() {
+        const file = document.getElementById('excel_input').files[0];
+        if(!file) return;
+        const btn = document.getElementById('yukle_btn');
+        btn.disabled = true; btn.innerText = "İŞLENİYOR...";
+        const formData = new FormData();
+        formData.append('file', file);
+        try {
+            const res = await fetch('/toplu-urun-yukle/', { method: 'POST', body: formData });
+            const data = await res.json();
+            document.getElementById('rapor-icerik').innerHTML = data.message;
+            mShow('rapor-modal');
+        } catch(e) { bildirim("Hata!", "error"); }
+        finally { btn.disabled = false; btn.innerText = "🚀 AKTARIMI BAŞLAT"; }
+    }
+
+    document.getElementById('guncelle_input')?.addEventListener('change', async function() {
+        const file = this.files[0];
+        if(!file) return;
+        const formData = new FormData();
+        formData.append('file', file);
+        bildirim("Toplu güncelleme başladı...", "info");
+        try {
+            const res = await fetch('/toplu-guncelle/', { method: 'POST', body: formData });
+            const data = await res.json();
+            document.getElementById('rapor-icerik').innerHTML = data.message;
+            mShow('rapor-modal');
+        } catch(e) { bildirim("Hata!", "error"); }
+    });
+
+    document.getElementById('excel_input')?.addEventListener('change', function() {
+        if(this.files[0]) {
+            document.getElementById('dosya_adi_text').innerText = "Seçildi: " + this.files[0].name;
+            document.getElementById('yukle_btn').style.display = 'block';
+        }
+    });
+
+    async function hizliEkle(url, ad) {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: `ad=${encodeURIComponent(ad)}`
+        });
+        if(res.ok) location.reload(); else bildirim("Hata!", "error");
+    }
+    function kategoriEkle(e) { e.preventDefault(); hizliEkle('/kategori-ekle/', document.getElementById('kat_input').value); }
+    function musteriEkle(e) { e.preventDefault(); hizliEkle('/musteri-ekle/', document.getElementById('mus_input').value); }
+    function rafEkle(e) { e.preventDefault(); hizliEkle('/yer-ekle/', document.getElementById('raf_input').value); }
+
+    function modernSifirlaOnay() {
+        if(document.getElementById('sifre_onay').value === '987654') {
+            document.getElementById('modal-metin').innerText = "TÜM STOK VERİLERİ SİLİNECEK! ONAYLIYOR MUSUNUZ?";
+            document.getElementById('modal-onay-btn').onclick = async () => {
+                const res = await fetch('/sistemi-sifirla', { method: 'POST' });
+                if(res.ok) location.reload();
+            };
+            mShow('yonetim-modal');
+        } else bildirim("Şifre Yanlış!", "error");
+    }
+
+    function bildirim(msg, type='success') {
+        const color = type === 'success' ? '#10b981' : (type === 'info' ? '#3b82f6' : '#ef4444');
+        const toast = document.createElement('div');
+        toast.style = `background:${color}; color:white; padding:12px 24px; border-radius:10px; margin-bottom:10px; font-weight:700; box-shadow:0 4px 12px rgba(0,0,0,0.15); animation: slideIn 0.3s ease-out;`;
+        toast.innerText = msg;
+        document.getElementById('toast-container').appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+    }
+</script>
+
+<style>
+    @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+</style>
+{% endblock %}

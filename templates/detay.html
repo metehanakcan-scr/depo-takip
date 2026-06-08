@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Kategori Detayı: {{ kategori.ad }}{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 20px;">
+    <a href="/urun-listesi/" style="text-decoration: none; color: #4834d4; font-weight: bold;">← Listeye Geri Dön</a>
+</div>
+
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #f1f2f6; padding-bottom: 15px; margin-bottom: 20px;">
+        <h1 style="margin:0;">📂 Kategori: {{ kategori.ad }}</h1>
+        <div style="text-align: right;">
+            <span style="background: #4834d4; color: white; padding: 5px 15px; border-radius: 20px; font-size: 14px;">
+                Toplam Çeşit: {{ kategori.urunler|length }}
+            </span>
+        </div>
+    </div>
+
+    <table style="width: 100%; border-collapse: collapse;">
+        <thead>
+            <tr style="text-align: left; background: #f8f9fa;">
+                <th style="padding: 15px;">BARKOD</th>
+                <th>ÜRÜN ADI</th>
+                <th>MİKTAR</th>
+                <th>DURUM</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for u in kategori.urunler %}
+            <tr style="{{ 'background-color: #fff9f4;' if u.miktar < 10 else '' }}">
+                <td style="padding: 15px;"><code>{{ u.barkod }}</code></td>
+                <td>{{ u.isim }}</td>
+                <td><b>{{ u.miktar }}</b></td>
+                <td>
+                    {% if u.miktar < 10 %}
+                        <span style="color: #e67e22; font-weight: bold; font-size: 13px;">⚠️ Kritik Stok</span>
+                    {% else %}
+                        <span style="color: #2ed573; font-weight: bold; font-size: 13px;">✅ Normal</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% if not kategori.urunler %}
+    <p style="text-align: center; padding: 20px; color: #7f8c8d;">Bu kategoride henüz ürün bulunmuyor.</p>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Depo Pro v3 | Giriş</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-gradient: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+            --bg: #f1f5f9; 
+            --text: #1e293b;
+        }
+
+        * { 
+            box-sizing: border-box; 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            -webkit-tap-highlight-color: transparent; 
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background: var(--bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .login-card {
+            background: #ffffff;
+            width: 100%;
+            max-width: 400px;
+            padding: 40px;
+            border-radius: 16px; /* Kayıt sayfasıyla eşitlendi */
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08); /* Yumuşak modern gölge */
+            transition: transform 0.3s ease;
+        }
+
+        .login-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .logo-area {
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: var(--text);
+            margin-bottom: 8px;
+            letter-spacing: -1.5px;
+            text-align: center;
+        }
+
+        .logo-area span {
+            color: var(--primary);
+        }
+
+        p { 
+            color: #64748b; 
+            font-size: 0.95rem; 
+            margin-bottom: 30px; 
+            text-align: center;
+        }
+
+        .form-group { 
+            text-align: left; 
+            margin-bottom: 20px; 
+        }
+
+        label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: #666;
+            margin-bottom: 8px;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 16px;
+            color: var(--text);
+            background: #f8fafc;
+            transition: all 0.3s ease;
+            outline: none;
+        }
+
+        input:focus {
+            border-color: var(--primary);
+            background: white;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+        }
+
+        .btn-login {
+            width: 100%;
+            padding: 14px;
+            background: var(--primary-gradient);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+            box-shadow: 0 4px 6px rgba(99, 102, 241, 0.2);
+            transition: opacity 0.3s ease;
+        }
+
+        .btn-login:hover {
+            opacity: 0.9;
+        }
+
+        .btn-login:active { 
+            transform: scale(0.98); 
+        }
+
+        .error-box {
+            margin-top: 20px;
+            padding: 12px;
+            background: #fff1f2;
+            border-radius: 8px;
+            color: #e11d48;
+            font-size: 14px;
+            text-align: center;
+            border: 1px solid #fecdd3;
+            font-weight: 600;
+        }
+
+        .register-link {
+            text-align: center;
+            margin-top: 24px;
+            font-size: 14px;
+            color: #718096;
+        }
+
+        .register-link a {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .register-link a:hover {
+            text-decoration: underline;
+        }
+
+        /* Mobil Optimizasyon */
+        @media (max-width: 480px) {
+            .login-card { padding: 30px 20px; }
+            .logo-area { font-size: 1.8rem; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="login-card">
+    <div class="logo-area">📦 DEPO <span>PRO</span></div>
+    <p>Depo Yönetim Sistemine Giriş</p>
+
+    <form action="/login" method="post">
+        <div class="form-group">
+            <label>Kullanıcı Adı</label>
+            <input type="text" name="kullanici_adi" placeholder="Kullanıcı adınız" required autofocus autocomplete="off" style="text-transform: uppercase;"
+           oninput="this.value = this.value.toUpperCase();" >
+        </div>
+        <div class="form-group">
+            <label>Şifre</label>
+            <input type="password" name="sifre" placeholder="••••••••" required>
+        </div>
+        <button type="submit" class="btn-login">SİSTEME GİRİŞ YAP</button>
+    </form>
+    <div class="register-link" style="margin-top: 15px;">
+        <a href="/sifre-yenileme" style="font-size: 13px; color: #64748b; font-weight: normal;">Şifremi Unuttum</a>
+    </div>
+
+    <div class="register-link">
+        Hesabınız yok mu? <a href="/kayit">Kayıt Ol</a>
+    </div>
+
+    {% if error %}
+    <div class="error-box">
+        ⚠️ {{ error }}
+    </div>
+    {% endif %}
+</div>
+
+</body>
+</html>
