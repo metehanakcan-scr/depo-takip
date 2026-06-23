@@ -8,7 +8,13 @@ from datetime import datetime, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from contextlib import asynccontextmanager
-
+# Mevcut SQLAlchemy importlarını şu şekilde genişlet:
+from sqlalchemy import (
+    create_engine, text, cast, String, func, case, 
+    Column, Integer, ForeignKey, DateTime, Boolean
+)
+# Şunları ekle:
+from sqlalchemy.orm import sessionmaker, Session, relationship, joinedload
 import pandas as pd
 from dotenv import load_dotenv
 from fastapi import FastAPI, Depends, HTTPException, Request, Form, Response, UploadFile, File, APIRouter
@@ -253,28 +259,48 @@ async def kayit_islemi(
 @app.get("/")
 def root(): return RedirectResponse(url="/stok-paneli/")
 
+# --- 2. STOK PANELİ (Dashboard) ---
 @app.get("/stok-paneli/", response_class=HTMLResponse)
 def dashboard(request: Request, db: Session = Depends(get_db)):
-    urunler = db.query(models.UrunModel).all()
-    istatistik = {"cesit": len(urunler), "adet": sum(u.miktar for u in urunler), "kritik": len([u for u in urunler if u.miktar < 10])}
-    return templates.TemplateResponse("index.html", {"request": request, "istatistik": istatistik, "urunler": urunler})
+    # Tüm tabloyu Python'un RAM'ine çekip saydırmak yerine, bu işi SQL'in kendisine yaptırıyoruz. (Çok hızlıdır)
+    cesit = db.query(func.count(models.UrunModel.id)).scalar() or 0
+    adet = db.query(func.sum(models.UrunModel.miktar)).scalar() or 0
+    kritik = db.query(func.count(models.UrunModel.id)).filter(models.UrunModel.miktar < 10).scalar() or 0
+    
+    istatistik = {"cesit": cesit, "adet": adet, "kritik": kritik}
+    
+    # Ekrana basılacak liste için N+1 çözümünü uyguluyoruz.
+    urunler_sorgusu = db.query(models.UrunModel).options(joinedload(models.UrunModel.kategori)).all()
+    
+    return templates.TemplateResponse("index.html", {"request": request, "istatistik": istatistik, "urunler": urunler_sorgusu})
 
+# --- 1. ÜRÜN LİSTESİ (En çok yavaşlayan sayfa) ---
 @app.get("/urun-listesi/", response_class=HTMLResponse)
 def urun_listesi(request: Request, db: Session = Depends(get_db)):
-    return templates.TemplateResponse("urunler.html", {"request": request, "urunler": db.query(models.UrunModel).all()})
+    # joinedload ile kategoriyi ürünle birlikte aynı anda çekiyoruz
+    urunler = db.query(models.UrunModel).options(joinedload(models.UrunModel.kategori)).all()
+    return templates.TemplateResponse("urunler.html", {"request": request, "urunler": urunler})
 
+
+# --- 3. ÜRÜN YÖNETİMİ VE ÇIKIŞ SAYFALARI ---
 @app.get("/urun-yonetimi/", response_class=HTMLResponse)
 def urun_yonetimi_sayfasi(request: Request, db: Session = Depends(get_db)):
     if not request.state.user.get("can_add_stock"): raise HTTPException(status_code=403)
-    return templates.TemplateResponse("ekle.html", {"request": request, "urunler": db.query(models.UrunModel).all(), "kategoriler": db.query(models.Kategori).all(), "yerler": db.query(models.DepoYeri).all()})
+    
+    urunler_sorgusu = db.query(models.UrunModel).options(joinedload(models.UrunModel.kategori)).all()
+    
+    return templates.TemplateResponse("ekle.html", {"request": request, "urunler": urunler_sorgusu, "kategoriler": db.query(models.Kategori).all(), "yerler": db.query(models.DepoYeri).all()})
 
 @app.get("/stok-cikisi-sayfasi/", response_class=HTMLResponse)
 def stok_cikisi_sayfasi(request: Request, db: Session = Depends(get_db)):
     if not request.state.user.get("can_exit_stock"): raise HTTPException(status_code=403)
-    return templates.TemplateResponse("cikis.html", {"request": request, "urunler": db.query(models.UrunModel).all(), "musteriler": db.query(models.Musteri).all()})
+    
+    urunler_sorgusu = db.query(models.UrunModel).options(joinedload(models.UrunModel.kategori)).all()
+    
+    return templates.TemplateResponse("cikis.html", {"request": request, "urunler": urunler_sorgusu, "musteriler": db.query(models.Musteri).all()})
+
 
 @app.get("/stok-hareketleri/", response_class=HTMLResponse)
-
 def hareket_sayfasi(
     request: Request, 
     f_islem_no: str = None, 
@@ -310,15 +336,11 @@ def hareket_sayfasi(
     # Önce ham fitrelenmiş hareketleri çekiyoruz
     filtreli_hareketler = query.order_by(models.StokHareketi.id.desc()).all()
     
-    # --- KRİTİK NOKTA: İşlem Numarasına Göre Gruplama Mantığı ---
-    # Eğer kullanıcı bir arama yaptıysa (örn: CRAFT), o arama sonucuna eşleşen İŞLEM NUMARALARINI topluyoruz.
-    # Ardından o işlem numaralarına ait TÜM alt kalemleri getiriyoruz ki kart bozulmasın, diğer ürünler de görünsün.
+    # --- Gruplama Mantığı ---
     if f_urun or f_lot or f_islem or f_musteri or f_tarih or f_not or f_islem_no:
         eslesen_islem_nolar = {h.islem_no for h in filtreli_hareketler if h.islem_no}
-        # Esleşen tüm işlem numaralarının altındaki bütün kalemleri temizce çekiyoruz
         tum_kalemler = db.query(models.StokHareketi).filter(models.StokHareketi.islem_no.in_(eslesen_islem_nolar)).order_by(models.StokHareketi.id.desc()).all()
     else:
-        # Arama yoksa direkt son hareketleri alıyoruz (Performans için sınırlandırılabilir, limit 300)
         tum_kalemler = db.query(models.StokHareketi).order_by(models.StokHareketi.id.desc()).limit(300).all()
 
     # Bellekte gruplama işlemi
@@ -337,17 +359,17 @@ def hareket_sayfasi(
                 "kalemler": []
             }
         gruplanmis[no]["kalemler"].append({
+            "barkod": h.urun_barkod or "",  # Barkod alanı buraya eklendi
             "urun_isim": h.urun_isim,
             "urun_lot": h.urun_lot or "-",
             "miktar_degisimi": h.miktar_degisimi
         })
 
-    # Kartları tarihe göre en yeni en üstte olacak şekilde listeye çeviriyoruz
     kart_listesi = sorted(gruplanmis.values(), key=lambda x: x["tarih"] if x["tarih"] else datetime.min, reverse=True)
 
     return templates.TemplateResponse("hareketler.html", {
         "request": request, 
-        "kart_listesi": kart_listesi, # Şablona artık düz tablo değil gruplanmış kart yapısı gidiyor
+        "kart_listesi": kart_listesi,
         "filtreler": {
             "islem_no": f_islem_no or "",
             "urun": f_urun or "", 
@@ -472,50 +494,85 @@ def yonetim_sayfasi(request: Request, db: Session = Depends(get_db)):
     if not user.get("can_manage_users") and user.get("rol_adi") != "ADMIN": return RedirectResponse(url="/stok-paneli/")
     return templates.TemplateResponse("yonetim.html", {"request": request, "kategoriler": db.query(models.Kategori).all(), "musteriler": db.query(models.Musteri).all(), "yerler": db.query(models.DepoYeri).all(), "kullanicilar": db.query(models.Kullanici).all(), "roller": db.query(models.Rol).order_by(models.Rol.id).all()})
 
+# --- 4. EXCEL AKTARIM ŞABLONU (Arkada çalışan ağır işlem) ---
 @app.get("/stok-guncelleme-sablonu")
 def stok_guncelleme_sablonu(tip: str = "sablon" , db: Session = Depends(get_db)):
-    urunler = db.query(models.UrunModel).all()
-    data = [{"ID": u.id, "BARKOD": u.barkod, "ISIM": u.isim, "LOT": u.lot, "MIKTAR": u.miktar, "KATEGORI": u.kategori.ad if u.kategori else "GENEL", "YER": u.yer} for u in urunler]
+    # Excel dosyası oluşturulurken de kategori adı çekildiği için buraya da joinedload eklendi.
+    urunler_sorgusu = db.query(models.UrunModel).options(joinedload(models.UrunModel.kategori)).all()
+    data = [{"ID": u.id, "BARKOD": u.barkod, "ISIM": u.isim, "LOT": u.lot, "MIKTAR": u.miktar, "KATEGORI": u.kategori.ad if u.kategori else "GENEL", "YER": u.yer, "KUTU_ICI_MIKTAR": u.kutu_ici} for u in urunler_sorgusu]
+    
     df = pd.DataFrame(data)
+
+    if not df.empty:
+        df = df.sort_values(by=["KATEGORI", "ISIM"], ascending=[True, True])
+
+
+
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         df.to_excel(writer, index=False, sheet_name='Stok_Guncelleme')
         worksheet = writer.sheets['Stok_Guncelleme']
-        # worksheet.protect()
         worksheet.set_column('A:A', 10, writer.book.add_format({'locked': True, 'bg_color': "#C00101", 'font_color': 'white'}))
         worksheet.set_column('B:D', 20, writer.book.add_format({'locked': False}))
-        worksheet.set_column('F:G', 20, writer.book.add_format({'locked': False}))
+        worksheet.set_column('F:H', 20, writer.book.add_format({'locked': False}))
         worksheet.set_column('E:E', 15, writer.book.add_format({'locked': False, 'num_format': '0'}))
+        
     output.seek(0)
     headers = {'Content-Disposition': f'attachment; filename="stok_listesi.xlsx"'}
     return StreamingResponse(output, headers=headers, media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 @app.post("/toplu-guncelle/")
 async def toplu_guncelle_api(file: UploadFile = File(...), db: Session = Depends(get_db), request: Request = None):
-    yapan = request.state.user.get("kullanici_adi") or request.state.user.get("username") or "SİSTEM"
+    # Kullanıcıyı al
+    yapan = "SİSTEM"
+    if request and hasattr(request.state, "user"):
+        yapan = request.state.user.get("kullanici_adi") or request.state.user.get("username") or "SİSTEM"
+        
     yeni_no = yeni_islem_no_al(db)
     
     contents = await file.read()
     df = pd.read_excel(io.BytesIO(contents), dtype=str).fillna("")
     
-    degisen = 0    # Gerçekten değişenler (Hareket kaydı atılanlar)
-    degismeyen = 0 # Hiç dokunulmayanlar
-    hata = 0       # Hata alanlar
+    # Sayaçlar
+    degisen = 0
+    degismeyen = 0
+    hata = 0
+    silinen = 0
+    
+    # Detay Listeleri
+    degisen_detay = []
+    hata_detay = []
+    silinen_detay = []
+    
+    excel_id_listesi = set() # Excel'de var olan tüm ID'leri tutacağız
     
     for index, row in df.iterrows():
         try:
-            u_id = row.get('ID')
-            if not u_id: continue
+            u_id_raw = row.get('ID')
+            if not u_id_raw or str(u_id_raw).strip() == "": 
+                continue
+                
+            u_id = int(float(str(u_id_raw).replace(',', '.')))
+            excel_id_listesi.add(u_id)
             
-            urun = db.query(models.UrunModel).filter(models.UrunModel.id == int(u_id)).first()
+            urun = db.query(models.UrunModel).filter(models.UrunModel.id == u_id).first()
             if urun:
                 # 1. Eski değerleri sakla
                 eski_barkod = str(urun.barkod).strip()
                 eski_isim = str(urun.isim).upper().strip()
-                eski_lot = str(urun.lot).strip()
+                eski_lot = str(urun.lot).strip() if urun.lot else ""
                 eski_miktar = urun.miktar
-                eski_yer = str(urun.yer).upper().strip()
+                eski_yer = str(urun.yer).upper().strip() if urun.yer else ""
                 eski_kat_id = urun.kategori_id
+                
+                # Kategori ismini bul (Görsel rapor için)
+                eski_kat_ad = "GENEL"
+                if eski_kat_id:
+                    eski_kat_obj = db.query(models.Kategori).filter(models.Kategori.id == eski_kat_id).first()
+                    if eski_kat_obj:
+                        eski_kat_ad = eski_kat_obj.ad
+
+                eski_kutu_ici = str(urun.kutu_ici).upper().strip() if urun.kutu_ici else ""
 
                 # 2. Yeni değerleri al
                 yeni_barkod = str(row.get('BARKOD', '')).strip()
@@ -526,21 +583,27 @@ async def toplu_guncelle_api(file: UploadFile = File(...), db: Session = Depends
                 
                 kat_ad = str(row.get('KATEGORI', '')).upper().strip()
                 yeni_kat_id = eski_kat_id
+                yeni_kat_ad = eski_kat_ad
                 if kat_ad:
                     kategori = db.query(models.Kategori).filter(models.Kategori.ad == kat_ad).first()
-                    if kategori: yeni_kat_id = kategori.id
+                    if kategori: 
+                        yeni_kat_id = kategori.id
+                        yeni_kat_ad = kategori.ad
 
-                # 3. Değişim Kontrolü
-                degisim_var = (
-                    yeni_barkod != eski_barkod or
-                    yeni_isim != eski_isim or
-                    yeni_lot != eski_lot or
-                    yeni_miktar != eski_miktar or
-                    yeni_yer != eski_yer or
-                    yeni_kat_id != eski_kat_id
-                )
+                yeni_kutu_ici = str(row.get('KUTU_ICI_MIKTAR', '')).upper().strip()
 
-                if degisim_var:
+                # 3. Değişim Kontrolü ve Raporlaması
+                yapilan_degisiklikler = []
+                
+                if eski_barkod != yeni_barkod: yapilan_degisiklikler.append(f"Barkod: {eski_barkod} ➔ {yeni_barkod}")
+                if eski_isim != yeni_isim: yapilan_degisiklikler.append(f"İsim: {eski_isim} ➔ {yeni_isim}")
+                if eski_lot != yeni_lot: yapilan_degisiklikler.append(f"Lot: {eski_lot} ➔ {yeni_lot}")
+                if eski_miktar != yeni_miktar: yapilan_degisiklikler.append(f"Miktar: {eski_miktar} ➔ {yeni_miktar}")
+                if eski_yer != yeni_yer: yapilan_degisiklikler.append(f"Raf: {eski_yer} ➔ {yeni_yer}")
+                if eski_kat_id != yeni_kat_id: yapilan_degisiklikler.append(f"Kategori: {eski_kat_ad} ➔ {yeni_kat_ad}")
+                if eski_kutu_ici != yeni_kutu_ici: yapilan_degisiklikler.append(f"Kutu İçi: {eski_kutu_ici} ➔ {yeni_kutu_ici}")
+
+                if len(yapilan_degisiklikler) > 0:
                     # Güncelle
                     urun.barkod = yeni_barkod
                     urun.isim = yeni_isim
@@ -548,6 +611,7 @@ async def toplu_guncelle_api(file: UploadFile = File(...), db: Session = Depends
                     urun.miktar = yeni_miktar
                     urun.yer = yeni_yer
                     urun.kategori_id = yeni_kat_id
+                    urun.kutu_ici = yeni_kutu_ici
 
                     # Hareket kaydı oluştur
                     miktar_farki = yeni_miktar - eski_miktar
@@ -561,23 +625,88 @@ async def toplu_guncelle_api(file: UploadFile = File(...), db: Session = Depends
                         urun_lot=str(urun.lot if urun.lot else "-"),
                         miktar_degisimi=int(miktar_farki),
                         islem_tipi=str(hareket_tipi),
-                        musteri_ad="EXCEL TOPLU GÜNCELLEME",
+                        islem_nedeni="EXCEL TOPLU GÜNCELLEME",
                         islem_no=int(yeni_no),
                         islem_yapan=str(yapan),
-                        aciklama=f"Miktar {eski_miktar}->{yeni_miktar}"
+                        aciklama=" | ".join(yapilan_degisiklikler) # Geçmişe de detayları yazalım
                     )
                     db.add(yeni_hareket)
                     degisen += 1
+                    
+                    # Rapora renkli ekle
+                    degisim_metni = " <br>&nbsp;&nbsp;&nbsp;&nbsp; ↳ ".join(yapilan_degisiklikler)
+                    degisen_detay.append(f"<span style='color:#0f172a'><b>ID {u_id} | {yeni_isim}</b>:</span><br>&nbsp;&nbsp;&nbsp;&nbsp; ↳ {degisim_metni}")
                 else:
                     degismeyen += 1
             else:
                 hata += 1
+                hata_detay.append(f"Satır {index+2}: ID <b>{u_id}</b> veritabanında bulunamadı.")
         except Exception as e:
-            print(f"Hata detayı: {e}")
             hata += 1
+            # Gerçek python hatasını yakala ve yazdır
+            hata_detay.append(f"Satır {index+2}: İşlem başarısız! <br><span style='color:#dc2626; font-size:11px;'>Hata Nedeni: {str(e)}</span>")
             
+    # --- 4. EXCEL'DEN SİLİNENLERİ VERİTABANINDAN SİLME İŞLEMİ ---
+    db_urunler = db.query(models.UrunModel).all()
+    for u in db_urunler:
+        if u.id not in excel_id_listesi:
+            silinen += 1
+            silinen_detay.append(f"<b>ID {u.id} | {u.barkod}</b> - {u.isim}")
+            db.query(models.StokHareketi).filter(models.StokHareketi.urun_barkod == u.barkod).delete(synchronize_session=False)
+            db.delete(u)
+
     db.commit() 
-    return {"message": f"✅ {degisen} Değişti, ⚪ {degismeyen} Aynı kaldı, ❌ {hata} Hata."}
+    
+    # --- 5. MODERN HTML RAPORU OLUŞTURMA ---
+    html_rapor = f"""
+    <div style="font-family: 'Inter', sans-serif;">
+        <div style="display: flex; gap:10px; justify-content: center; margin-bottom: 20px; font-weight: 800; font-size: 14px; text-align: center; flex-wrap: wrap;">
+            <span style="color: #166534; background: #dcfce7; padding: 6px 12px; border-radius: 8px;">✅ {degisen} DEĞİŞTİ</span>
+            <span style="color: #475569; background: #f1f5f9; padding: 6px 12px; border-radius: 8px;">⚪ {degismeyen} AYNI</span>
+            <span style="color: #991b1b; background: #fee2e2; padding: 6px 12px; border-radius: 8px;">🗑️ {silinen} SİLİNDİ</span>
+            <span style="color: #9a3412; background: #ffedd5; padding: 6px 12px; border-radius: 8px;">❌ {hata} HATA</span>
+        </div>
+    """
+
+    if degisen_detay:
+        html_rapor += f"""
+        <details style="margin-bottom: 10px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 12px; cursor: pointer; transition: 0.2s;">
+            <summary style="font-weight: 800; color: #166534; outline: none; list-style: none; display: flex; justify-content: space-between; align-items: center;">
+                <span>✅ Güncellenen Kayıt Detayları ({degisen})</span> <span>▼</span>
+            </summary>
+            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #bbf7d0; color: #15803d; font-size: 13px; max-height: 250px; overflow-y: auto;">
+                <div style="margin-bottom:10px;">{'</div><div style="margin-bottom:10px;">'.join(degisen_detay)}</div>
+            </div>
+        </details>
+        """
+
+    if silinen_detay:
+        html_rapor += f"""
+        <details style="margin-bottom: 10px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 10px; padding: 12px; cursor: pointer; transition: 0.2s;">
+            <summary style="font-weight: 800; color: #991b1b; outline: none; list-style: none; display: flex; justify-content: space-between; align-items: center;">
+                <span>🗑️ Silinen Kayıtlar ({silinen})</span> <span>▼</span>
+            </summary>
+            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #fecaca; color: #b91c1c; font-size: 13px; max-height: 200px; overflow-y: auto;">
+                {'<br>'.join(f'• {d}' for d in silinen_detay)}
+            </div>
+        </details>
+        """
+
+    if hata_detay:
+        html_rapor += f"""
+        <details style="margin-bottom: 10px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px; padding: 12px; cursor: pointer; transition: 0.2s;">
+            <summary style="font-weight: 800; color: #92400e; outline: none; list-style: none; display: flex; justify-content: space-between; align-items: center;">
+                <span>❌ Hata Detayları ({hata})</span> <span>▼</span>
+            </summary>
+            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #fde68a; color: #b45309; font-size: 13px; max-height: 200px; overflow-y: auto;">
+                {'<br><br>'.join(f'• {d}' for d in hata_detay)}
+            </div>
+        </details>
+        """
+
+    html_rapor += "</div>"
+
+    return {"message": html_rapor}
 
 @app.post("/rol-ekle/")
 def rol_ekle_api(ad: str = Form(...), db: Session = Depends(get_db), request: Request = None):
@@ -711,9 +840,17 @@ def stok_cikisi_toplu_api(v: schemas.TopluCikisSema, db: Session = Depends(get_d
     return {"status": "ok", "islem_no": yeni_no}
 
 def yeni_islem_no_al(db: Session):
-    # En son kayıtlı islem_no'yu bul, yoksa 1'den başlat
-    son = db.query(models.StokHareketi.islem_no).order_by(models.StokHareketi.id.desc()).first()
-    return (son[0] + 1) if son and son[0] else 1
+    # Tüm kayıtları ID'ye göre tersten al (En son eklenenden eskiye doğru)
+    tum_kayitlar = db.query(models.StokHareketi.islem_no).order_by(models.StokHareketi.id.desc()).all()
+    
+    for kayit in tum_kayitlar:
+        deger = kayit[0]
+        # Değerin None olup olmadığını ve integer'a dönüştürülebilir olup olmadığını kontrol et
+        if deger is not None and str(deger).isdigit():
+            return int(deger) + 1
+            
+    # Eğer hiç geçerli numara bulunamazsa 1'den başlat
+    return 1
 
 
 
@@ -775,11 +912,16 @@ async def urun_guncelle_api(barkod: str, v: schemas.UrunSema, request: Request, 
     if not user.get("can_edit_product") and user.get("rol_adi") != "ADMIN": 
         raise HTTPException(status_code=403)
     
+    # 1. Kullanıcı ismini güvenli şekilde al (Dict hatasını önlemek için)
+    yapan = user.get("kullanici_adi") or user.get("username") or "SİSTEM"
+    
+    # 2. Yeni işlem numarası oluştur
+    yeni_no = yeni_islem_no_al(db)
 
-    # 1. Eski lotu query parametresinden al (JS'ten gönderiyoruz)
+    # 3. Eski lotu query parametresinden al
     eski_lot = request.query_params.get("eski_lot")
     
-    # 2. Ürünü eski lot ve barkod ile bul
+    # 4. Ürünü bul
     u = db.query(models.UrunModel).filter(
         models.UrunModel.barkod == barkod,
         models.UrunModel.lot == eski_lot
@@ -788,32 +930,30 @@ async def urun_guncelle_api(barkod: str, v: schemas.UrunSema, request: Request, 
     if not u:
         raise HTTPException(status_code=404, detail="Ürün bulunamadı")
     
-    # 3. Bilgileri güncelle
+    # 5. Bilgileri güncelle
     u.isim = v.isim.upper().strip()
     u.lot = v.lot.strip() if v.lot else None
-
     u.yer = v.yer.upper() if v.yer else "-"
+    u.kutu_ici = v.kutu_ici.upper() if v.kutu_ici else "-"
     
     if v.kategori_ad:
         kat = db.query(models.Kategori).filter(models.Kategori.ad == v.kategori_ad.upper()).first()
         if kat: u.kategori_id = kat.id
-        
 
-    # 4. Stok Hareketini kaydet
-
+    # 6. Stok Hareketini yeni_no ile kaydet
     db.add(models.StokHareketi(
         urun_barkod=barkod, 
         urun_isim=u.isim, 
         urun_lot=v.lot, 
         miktar_degisimi=0, 
-
-        islem_tipi=f"BİLGİ GÜNCELLEME | {v.islem_nedeni} | YAPAN: {user['kullanici_adi']}"
-
+        islem_yapan=str(yapan),      # STRING olarak gönderiyoruz, dict hatası olmaz
+        islem_tipi="GÜNCELLEME",
+        islem_no=int(yeni_no),       # Yeni işlem numarası atandı
+        islem_nedeni="ÜRÜN GÜNCELLEME"
     ))
     
     db.commit()
-    return {"status": "ok"}
-
+    return {"status": "ok", "islem_no": yeni_no}
 @app.post("/musteri-ekle/")
 async def musteri_ekle_api(ad: str = Form(...), db: Session = Depends(get_db)):
     if db.query(models.Musteri).filter(models.Musteri.ad == ad.upper()).first(): raise HTTPException(status_code=400)
@@ -887,12 +1027,13 @@ async def hizli_sayim_barkod_detay(barkod: str, db: Session = Depends(get_db)):
 
 @app.get("/excel-sablonu-indir")
 def excel_sablonu_indir():
-    df = pd.DataFrame(columns=['BARKOD', 'ISIM', 'LOT', 'MIKTAR', 'KATEGORI', 'YER'])
-    df.loc[0] = ["'8690000000", "ÖRNEK ÜRÜN", "'002", "100", "GENEL", "A-1"]
+    df = pd.DataFrame(columns=['BARKOD', 'ISIM', 'LOT', 'MIKTAR', 'KATEGORI', 'YER', 'KUTU_ICI_MIKTAR'])
+    df.loc[0] = ["'8690000000", "ÖRNEK ÜRÜN", "'002", "100", "GENEL", "A-1", "4"]
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         df.to_excel(writer, index=False); worksheet = writer.sheets['Sheet1']
         worksheet.set_column('A:F', 13, writer.book.add_format({'num_format': '@'}))
+        worksheet.set_column('G:G', 20, writer.book.add_format({'locked': False}))
     output.seek(0)
     return StreamingResponse(output, headers={'Content-Disposition': 'attachment; filename="sablon.xlsx"'}, media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
@@ -925,7 +1066,7 @@ async def toplu_urun_yukle(
             isim = str(row["ISIM"]).upper().strip()
             lot = str(row["LOT"]).strip()
             miktar = int(float(row["MIKTAR"]))
-
+            kutu_ici = str(row["KUTU_ICI_MIKTAR"]).strip()
             if not b or not isim:
                 continue
 
@@ -959,7 +1100,8 @@ async def toplu_urun_yukle(
                     lot=lot,
                     miktar=miktar,
                     yer=str(row.get("YER", "")).upper().strip(),
-                    kategori_id=kategori_id
+                    kategori_id=kategori_id,
+                    kutu_ici = kutu_ici
                 )
                 db.add(yeni_urun)
                 yeni += 1
@@ -972,7 +1114,7 @@ async def toplu_urun_yukle(
                 urun_lot=lot if lot else "-",
                 miktar_degisimi=miktar,
                 islem_tipi="GİRİŞ",
-                musteri_ad="EXCEL TOPLU YÜKLEME", # İsteğin üzerine "Müşteri" alanına bu yazılacak
+                islem_nedeni="EXCEL TOPLU YÜKLEME", # İsteğin üzerine "Müşteri" alanına bu yazılacak
                 islem_no=yeni_no,
                 islem_yapan=yapan,
                 aciklama=""
@@ -1133,28 +1275,18 @@ def sifre_onayla_islem(
 
 
 
-# --- ADMIN RAPORLAR PANELİ ROTASI (KESİN SÜRÜM) ---
+# --- ADMIN RAPORLAR PANELİ ROTASI ---
 @app.get("/raporlar", response_class=HTMLResponse)
 def raporlar_sayfasi(request: Request, db: Session = Depends(get_db)):
-    # 1. Adım: Kullanıcı bilgisini tam olarak sizin sisteminizdeki gibi request.state üzerinden çekiyoruz
     user = getattr(request.state, "user", None)
-    
-    # Eğer kullanıcı oturum açmamışsa doğrudan giriş ekranına fırlat
     if not user:
         return RedirectResponse(url="/login", status_code=303)
     
-    # 2. Adım: Rol yetki kontrolü (Sadece ADMIN görebilir)
-    # Sizin yapınızda user bir sözlük (dict) olduğu için ['rol_adi'] kuralını güvenle işletiyoruz
     rol = user.get("rol_adi") if isinstance(user, dict) else getattr(user, "rol_adi", None)
-    
     if not rol or str(rol).upper() != "ADMIN":
-        # Yetkisiz personeli paneli görmemesi için ana stok paneline geri fırlatıyoruz
         return RedirectResponse(url="/stok-paneli/", status_code=303)
         
-    # 3. Adım: Her şey yolundaysa hazırladığımız şık raporlar.html şablonunu render et
     return templates.TemplateResponse("raporlar.html", {"request": request})
-
-
 
 
 @app.get("/api/raporlar-verisi")
@@ -1168,20 +1300,22 @@ def raporlar_verisi_api(
     secili_urun_barkod: str = "hepsi",
     secili_depo_yeri: str = "hepsi",
     olu_stok_gun: int = 60,
-    tarih_araligi: str = "hepsi"
+    tarih_araligi: str = "hepsi",
+    baslangic_tarihi: str = "", # YENİ
+    bitis_tarihi: str = "",     # YENİ
+    secili_kullanici: str = "hepsi", # YENİ
+    secili_musteri: str = "hepsi"    # YENİ
 ):
-    # 1. Yetki Kontrolü (Orijinal state.user kontrol mimariniz)
     user = getattr(request.state, "user", None)
     if not user or str(user.get("rol_adi", "")).upper() != "ADMIN":
         raise HTTPException(status_code=403, detail="Bu operasyonel rapora sadece Admin erişebilir.")
         
     try:
-        # Zaman Sınırları Hesaplama
         su_an = datetime.now()
         olu_stok_esigi = su_an - timedelta(days=olu_stok_gun)
         son_30_gun_esigi = su_an - timedelta(days=30)
         
-        # 2. TABAN ORM SORGUSU: İlişkisel Tabloları JOIN ile Bağlama
+        # TABAN ORM SORGUSU: İlişkisel Tabloları JOIN ile Bağlama
         sorgu = db.query(models.StokHareketi).join(
             models.UrunModel, models.StokHareketi.urun_barkod == models.UrunModel.barkod
         ).join(
@@ -1209,13 +1343,31 @@ def raporlar_verisi_api(
             kelime = f"%{arama_kelimesi.strip()}%"
             sorgu = sorgu.filter(models.StokHareketi.urun_isim.ilike(kelime) | models.StokHareketi.urun_barkod.ilike(kelime))
 
+        # YENİ: GELİŞMİŞ ZAMAN FİLTRESİ
         if tarih_araligi == "bugun":
             sorgu = sorgu.filter(func.date(models.StokHareketi.tarih) == func.current_date())
+        elif tarih_araligi == "bu_hafta":
+            bas_hafta = (su_an - timedelta(days=su_an.weekday())).replace(hour=0, minute=0, second=0)
+            sorgu = sorgu.filter(models.StokHareketi.tarih >= bas_hafta)
+        elif tarih_araligi == "bu_ay":
+            bas_ay = su_an.replace(day=1, hour=0, minute=0, second=0)
+            sorgu = sorgu.filter(models.StokHareketi.tarih >= bas_ay)
+        elif tarih_araligi == "ozel" and baslangic_tarihi and bitis_tarihi:
+            bas_dt = datetime.strptime(baslangic_tarihi, "%Y-%m-%d")
+            bit_dt = datetime.strptime(bitis_tarihi, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
+            sorgu = sorgu.filter(models.StokHareketi.tarih >= bas_dt, models.StokHareketi.tarih <= bit_dt)
 
-        # Verileri Hafızaya Çekme (Performans İndeksli)
+        # YENİ: KULLANICI VE MÜŞTERİ FİLTRESİ
+        if secili_kullanici != "hepsi":
+            sorgu = sorgu.filter(models.StokHareketi.islem_yapan == secili_kullanici)
+        
+        if secili_musteri != "hepsi":
+            sorgu = sorgu.filter((models.StokHareketi.musteri_ad == secili_musteri) | (models.StokHareketi.islem_nedeni == secili_musteri))
+
+
         hareketler = sorgu.order_by(models.StokHareketi.id.desc()).all()
 
-        # 3. Operasyonel ve Metrik Hesaplamalar
+        # Operasyonel ve Metrik Hesaplamalar
         toplam_giris = 0
         toplam_cikis = 0
         toplam_iade = 0
@@ -1226,7 +1378,6 @@ def raporlar_verisi_api(
             m_degisim = abs(h.miktar_degisimi) if h.miktar_degisimi else 0
             islem_metni = str(h.islem_tipi).upper()
             
-            # Giriş / Çıkış Ayrımı (Veritabanı döküm adlarına tam uyumlu)
             is_giris = any(k in islem_metni for k in ["GİRİŞ", "GIRIS", "KAYIT"])
             if is_giris:
                 toplam_giris += m_degisim
@@ -1234,7 +1385,10 @@ def raporlar_verisi_api(
                     toplam_iade += m_degisim
                     islem_nedenleri["MÜŞTERİ İADESİ"] += m_degisim
                 else:
-                    islem_nedenleri["DİĞER GİRİŞLER" if "DİĞER GİRİŞLER" in islem_nedenleri else "DİĞER TRANSFERLER"] += m_degisim
+                    if "DİĞER GİRİŞLER" in islem_nedenleri:
+                        islem_nedenleri["DİĞER GİRİŞLER"] += m_degisim
+                    else:
+                        islem_nedenleri["DİĞER TRANSFERLER"] += m_degisim
             else:
                 toplam_cikis += m_degisim
                 if "FİRE" in islem_metni or "FIRE" in islem_metni or "ZAYİAT" in islem_metni or "SAYIM" in islem_metni:
@@ -1242,9 +1396,9 @@ def raporlar_verisi_api(
                 else:
                     islem_nedenleri["SATIŞ/SEVK HAREKETİ"] += m_degisim
             
-            # Kategori Lojistik Dağılım Map'leme
-            kat_bul = db.query(models.Kategori.ad).join(models.UrunModel).filter(models.UrunModel.barkod == h.urun_barkod).scalar() or "GENEL"
-            kat_bul = kat_bul.upper()
+            kat_res = db.query(models.Kategori.ad).join(models.UrunModel).filter(models.UrunModel.barkod == h.urun_barkod).first()
+            kat_bul = kat_res[0].upper() if kat_res and kat_res[0] else "GENEL"
+            
             if kat_bul not in kategori_hacimler:
                 kategori_hacimler[kat_bul] = {"giris": 0, "cikis": 0, "iade": 0}
             
@@ -1252,22 +1406,20 @@ def raporlar_verisi_api(
                 if "İADE" in islem_metni or "IADE" in islem_metni:
                     kategori_hacimler[kat_bul]["iade"] += m_degisim
                 else:
-                    kategori_hacimler[kat_bul]["giris"] += m_degisim
+                    kategori_hacimler[kat_bul]["grid" if "grid" in kategori_hacimler[kat_bul] else "giris"] += m_degisim
             else:
                 kategori_hacimler[kat_bul]["cikis"] += m_degisim
 
-        # 4. ÜRÜN SİRKÜLASYON HIZI VE ÖLÜ STOK DETAY ANALİZİ (Scatter Plot Verisi)
+        # ÜRÜN SİRKÜLASYON HIZI VE ÖLÜ STOK DETAY ANALİZİ
         urunler_havuzu = db.query(models.UrunModel).all()
         scatter_verisi = []
         olu_stok_adedi = 0
         kritik_stok_sayisi = 0
         
         for u in urunler_havuzu:
-            # Kritik stok kontrolü (Örn: miktar < 10 ise)
             if u.miktar < 10:
                 kritik_stok_sayisi += 1
                 
-            # Son işlem tarihini çekme
             son_hareket_tarihi = db.query(models.StokHareketi.tarih).filter(
                 models.StokHareketi.urun_barkod == u.barkod
             ).order_by(models.StokHareketi.id.desc()).first()
@@ -1276,7 +1428,6 @@ def raporlar_verisi_api(
             if hareketsiz_gun >= olu_stok_gun:
                 olu_stok_adedi += u.miktar
                 
-            # Son 30 günlük çıkış adedi
             son_30_gun_cikis = db.query(func.sum(models.StokHareketi.miktar_degisimi)).filter(
                 models.StokHareketi.urun_barkod == u.barkod,
                 models.StokHareketi.tarih >= son_30_gun_esigi,
@@ -1289,18 +1440,49 @@ def raporlar_verisi_api(
                 "label": u.isim.upper()
             })
 
-        # Donut Grafik İçin Fiziksel Hacimsel Doluluk Dağılımı (Miktar * 0.05 m³ varsayımıyla)
         hacim_sorgu = db.query(models.Kategori.ad, func.sum(models.UrunModel.miktar)).join(
             models.UrunModel, models.Kategori.id == models.UrunModel.kategori_id
         ).group_by(models.Kategori.ad).all()
         
         pie_labels = [r[0].upper() for r in hacim_sorgu if r[0]]
-        pie_values = [round(int(r[1]) * 0.04, 2) for r in hacim_sorgu if r[1]] # m³ dönüştürme rasyosu
+        pie_values = [round(int(r[1]) * 0.04, 2) for r in hacim_sorgu if r[1]]
 
-        # Filtreleri ve SelectBox Elemanlarını Dolduracak Dinamik Listeler
+        # DRILLDOWN GRAFİK
+        kategoriler_sorgu = db.query(models.Kategori).all()
+        drilldown_kategori_labels = []
+        drilldown_kategori_values = []
+        urunler_kirilim = {}
+        
+        for kat in kategoriler_sorgu:
+            toplam_kat_stok = 0
+            u_labels = []
+            u_values = []
+            
+            for urun in kat.urunler:
+                if urun.miktar and urun.miktar > 0:
+                    toplam_kat_stok += urun.miktar
+                    u_labels.append(urun.isim.upper())
+                    u_values.append(urun.miktar)
+                    
+            if toplam_kat_stok > 0:
+                kat_ad_up = kat.ad.upper()
+                drilldown_kategori_labels.append(kat_ad_up)
+                drilldown_kategori_values.append(toplam_kat_stok)
+                urunler_kirilim[kat_ad_up] = {
+                    "labels": u_labels,
+                    "values": u_values
+                }
+
+        # Filtre Elemanları Listesi
         kategori_isimleri = [k[0].upper() for k in db.query(models.Kategori.ad).distinct().all() if k[0]]
         urun_kartela = [{"barkod": ur.barkod, "isim": ur.isim.upper()} for ur in db.query(models.UrunModel.barkod, models.UrunModel.isim).all()]
         depo_raflar = [r[0].upper() for r in db.query(models.UrunModel.yer).distinct().all() if r[0]]
+        
+        kullanici_isimleri = [k[0] for k in db.query(models.StokHareketi.islem_yapan).distinct().all() if k[0]]
+        
+        m1 = [m[0].upper() for m in db.query(models.StokHareketi.musteri_ad).distinct().all() if m[0]]
+        m2 = [m[0].upper() for m in db.query(models.StokHareketi.islem_nedeni).distinct().all() if m[0]]
+        musteri_isimleri = sorted(list(set(m1 + m2)))
 
         toplam_stok_adeti = db.query(func.sum(models.UrunModel.miktar)).scalar() or 0
         toplam_cesit = db.query(func.count(models.UrunModel.id)).scalar() or 0
@@ -1310,13 +1492,10 @@ def raporlar_verisi_api(
         print("Lojistik BI Sorgu Hatası:", e)
         return {"error": str(e)}
 
-    # UI Tablosuna Gönderilecek Liste (Filtreye Duyarlı Son 10 İşlem)
     detay_listesi = []
     for h in hareketler[:10]:
         t_tarih = h.tarih.strftime("%d.%m.%Y %H:%M") if h.tarih else "04.06.2026 15:00"
-        islem_tipi_raw = str(h.islem_tipi).upper()
         
-        # Son hareket tarihine göre ürün hareketsiz gün hesabı
         u_son_hrk = db.query(models.StokHareketi.tarih).filter(models.StokHareketi.urun_barkod == h.urun_barkod).order_by(models.StokHareketi.id.desc()).first()
         h_gun = (su_an - u_son_hrk[0]).days if u_son_hrk else 0
         
@@ -1324,7 +1503,7 @@ def raporlar_verisi_api(
             "tarih": t_tarih,
             "tip": str(h.islem_tipi).upper(),
             "evrak": f"HRK-{h.id}",
-            "cari": h.urun_isim,
+            "cari": h.urun_isim.upper() if h.urun_isim else "-",
             "miktar": f"{abs(h.miktar_degisimi)} ADET",
             "hareketsiz_gun": h_gun
         })
@@ -1353,5 +1532,12 @@ def raporlar_verisi_api(
         "kategoriler": kategori_isimleri,
         "urunler": urun_kartela,
         "raflar": depo_raflar,
-        "table": detay_listesi
+        "kullanicilar": kullanici_isimleri,
+        "musteriler": musteri_isimleri,
+        "table": detay_listesi,
+        "drilldown": {
+            "kategori_labels": drilldown_kategori_labels,
+            "kategori_values": drilldown_kategori_values,
+            "urunler_kırılım": urunler_kirilim
+        }
     }

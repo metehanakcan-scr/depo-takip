@@ -34,6 +34,7 @@
         max-width: 400px;
         height: 45px !important;
         border: 2px solid var(--border) !important;
+        text-transform: uppercase; /* Görsel olarak da büyük gösterir */
     }
 
     /* --- MOBİL İÇİN KART TASARIMI --- */
@@ -99,13 +100,14 @@
     <div class="search-wrapper">
         <div>
             <h2 style="margin:0; color:var(--sidebar); letter-spacing:-1px;">📋 GÜNCEL STOK LİSTESİ</h2>
-            <small style="color:var(--primary); font-weight:700;">TOPLAM {{ urunler|length }} ÇEŞİT ÜRÜN TANIMLI</small>
+            <small style="color:var(--primary); font-weight:700;">TOPLAM {{ urunler|length }} ÇEŞİT ÜRÜN</small>
+            <small id="limitBilgi" style="color:#64748b; font-weight:700; margin-left: 5px; display: none;">(İlk 50 Kayıt Gösteriliyor)</small>
         </div>
-        <input type="text" id="tabloAra" class="search-input" placeholder="Barkod, İsim veya Lot Ara...">
+        <input type="text" id="tabloAra" class="search-input" placeholder="Barkod, İsim veya Lot Ara..." oninput="turkceBuyukHarf(this)">
         <div style="display: flex; gap: 10px; flex-wrap: wrap;">  
-            <a href="/stok-guncelleme-sablonu?tip=liste" class="btn" style="background: #16a34a; color: white; display: flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 10px; text-decoration: none; font-weight: 700; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+            <button onclick="tabloyuExceleAktar()" class="btn" style="background: #16a34a; border: none; cursor: pointer; color: white; display: flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 10px; font-weight: 700; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
                 <i class="fas fa-file-excel"></i> EXCEL'E AKTAR (STOK LİSTESİ)
-            </a>
+            </button>
         </div>
     </div>
 
@@ -151,74 +153,151 @@
     </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
 <script>
-    // Dinamik Arama
-    $("#tabloAra").on("keyup", function() {
-        var value = $(this).val().toLowerCase();
-        $("#urunTablosu tr").filter(function() {
-            $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1)
+    // --- 50 SATIR LİMİTİ UYGULAMA FONKSİYONU ---
+    const GOSTERIM_LIMITI = 50;
+
+    function ilkElliyiGoster() {
+        const rows = document.querySelectorAll('#urunTablosu tr');
+        let gizlenenSira = 0;
+
+        rows.forEach((row, index) => {
+            if (index < GOSTERIM_LIMITI) {
+                row.style.display = ''; 
+            } else {
+                row.style.display = 'none';
+                gizlenenSira++;
+            }
         });
+
+        // 50'den fazla ürün varsa kullanıcıya bilgi ver
+        const limitBilgi = document.getElementById('limitBilgi');
+        if (limitBilgi) {
+            limitBilgi.style.display = gizlenenSira > 0 ? 'inline' : 'none';
+        }
+    }
+
+
+    // --- TÜRKÇE KARAKTER BÜYÜTME FONKSİYONU ---
+    function turkceBuyukHarf(element) {
+        let cursorPosition = element.selectionStart;
+        element.value = element.value.toLocaleUpperCase('tr-TR');
+        element.setSelectionRange(cursorPosition, cursorPosition);
+    }
+
+    // --- EXCEL AKTARIM FONKSİYONU ---
+    function tabloyuExceleAktar() {
+        let excelVerisi = [];
+        excelVerisi.push(["BARKOD", "ÜRÜN ADI", "LOT", "MİKTAR", "KATEGORİ", "YER"]);
+
+        const rows = document.querySelectorAll('#urunTablosu tr');
+        const aramaKutusuDegeri = document.getElementById("tabloAra").value.trim();
+
+        rows.forEach(row => {
+            if (aramaKutusuDegeri === "" || row.style.display !== 'none') {
+                const cells = row.querySelectorAll('td');
+                if (cells.length > 0) {
+                    const barkod = cells[0].innerText.trim();
+                    const ad = cells[1].innerText.trim();
+                    const lot = cells[2].innerText.trim();
+                    const miktar = cells[3].innerText.replace('ADET', '').trim();
+                    const kategori = cells[4].innerText.trim();
+                    const yer = cells[5].innerText.trim();
+
+                    excelVerisi.push([barkod, ad, lot, miktar, kategori, yer]);
+                }
+            }
+        });
+
+        if (excelVerisi.length === 1) {
+            alert("Aktarılacak veri bulunamadı (Filtre sonucu boş).");
+            return;
+        }
+
+        const worksheet = XLSX.utils.aoa_to_sheet(excelVerisi);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Stok Listesi");
+
+        worksheet['!cols'] = [
+            {wch: 15}, {wch: 35}, {wch: 15}, {wch: 10}, {wch: 20}, {wch: 20}
+        ];
+
+        const dosyaAdi = `Guncel_Stok_Listesi_${new Date().toLocaleDateString().replace(/\./g, '_')}.xlsx`;
+        XLSX.writeFile(workbook, dosyaAdi);
+    }
+
+    // --- DİNAMİK ARAMA (AKILLI LİMİT KONTROLÜ İLE) ---
+    $("#tabloAra").on("keyup", function() {
+        var value = $(this).val().toLocaleUpperCase('tr-TR');
+        var limitBilgi = document.getElementById('limitBilgi');
+
+        if (value.trim() === '') {
+            ilkElliyiGoster();
+        } else {
+            if (limitBilgi) limitBilgi.style.display = 'none';
+            
+            $("#urunTablosu tr").filter(function() {
+                $(this).toggle($(this).text().toLocaleUpperCase('tr-TR').indexOf(value) > -1)
+            });
+        }
     });
 
-    // Tabloyu Sıralama
-    function sirala(n) {
-        var table, rows, switching, i, x, y, shouldSwitch, dir, switchcount = 0;
-        table = document.getElementById("urunTablosu");
-        switching = true;
-        dir = "asc"; 
+    // --- YÜKSEK PERFORMANSLI TABLO SIRALAMA ---
+    let sonSiralananSutun = -1;
+    let mevcutYon = "asc";
 
-        while (switching) {
-            switching = false;
-            rows = table.rows;
-            for (i = 0; i < (rows.length - 1); i++) {
-                shouldSwitch = false;
-                x = rows[i].getElementsByTagName("TD")[n];
-                y = rows[i + 1].getElementsByTagName("TD")[n];
-                
-                if (n === 3) {
-                    var xVal = parseFloat(x.innerText) || 0;
-                    var yVal = parseFloat(y.innerText) || 0;
-                    if (dir == "asc") {
-                        if (xVal > yVal) { shouldSwitch = true; break; }
-                    } else if (dir == "desc") {
-                        if (xVal < yVal) { shouldSwitch = true; break; }
-                    }
-                } else {
-                    if (dir == "asc") {
-                        if (x.innerHTML.toLowerCase() > y.innerHTML.toLowerCase()) { shouldSwitch = true; break; }
-                    } else if (dir == "desc") {
-                        if (x.innerHTML.toLowerCase() < y.innerHTML.toLowerCase()) { shouldSwitch = true; break; }
-                    }
-                }
-            }
-            if (shouldSwitch) {
-                rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
-                switching = true;
-                switchcount ++;
+    function sirala(n) {
+        const tbody = document.getElementById("urunTablosu");
+        const rows = Array.from(tbody.querySelectorAll("tr"));
+        
+        // Sıralama yönünü belirle (Aynı sütuna tıklanırsa tersine çevir)
+        if (sonSiralananSutun === n) {
+            mevcutYon = mevcutYon === "asc" ? "desc" : "asc";
+        } else {
+            mevcutYon = "asc";
+            sonSiralananSutun = n;
+        }
+
+        // JavaScript yerleşik hızlı dizi sıralaması
+        rows.sort((rowA, rowB) => {
+            const cellA = rowA.getElementsByTagName("TD")[n];
+            const cellB = rowB.getElementsByTagName("TD")[n];
+            
+            if (!cellA || !cellB) return 0;
+
+            const valA = cellA.textContent.trim();
+            const valB = cellB.textContent.trim();
+
+            // Miktar sütunu (n === 3) ise sayısal sıralama yap
+            if (n === 3) {
+                const numA = parseFloat(valA) || 0;
+                const numB = parseFloat(valB) || 0;
+                return mevcutYon === "asc" ? numA - numB : numB - numA;
             } else {
-                if (switchcount == 0 && dir == "asc") {
-                    dir = "desc";
-                    switching = true;
-                }
+                // Türkçe karakterlere tam uyumlu metinsel sıralama
+                return mevcutYon === "asc" 
+                    ? valA.localeCompare(valB, 'tr-TR', { sensitivity: 'base' }) 
+                    : valB.localeCompare(valA, 'tr-TR', { sensitivity: 'base' });
             }
+        });
+
+        // Sıralanan satırları performanslı bir şekilde DOM fragment kullanarak tek hamlede ekrana bas
+        const fragment = document.createDocumentFragment();
+        rows.forEach(row => fragment.appendChild(row));
+        tbody.appendChild(fragment);
+
+        // Sıralama bittiğinde arama kutusu boşsa 50 satır sınırını koru
+        const aramaDegeri = document.getElementById("tabloAra").value.trim();
+        if (aramaDegeri === "") {
+            ilkElliyiGoster();
         }
     }
 
     document.addEventListener("DOMContentLoaded", function() {
-        sirala(1); 
+        sirala(1); // Sayfa açılışında önce isme göre sıralar
+        ilkElliyiGoster(); // Sıralama bitince sadece ilk 50'yi gösterir
     });
-</script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/colresizable/1.6.0/colResizable-1.6.min.js"></script>
-<script>
-$(document).ready(function(){
-    $("table").colResizable({
-        liveDrag: true,
-        gripInnerHtml: "<div class='grip'></div>",
-        draggingClass: "dragging",
-        resizeMode: 'fit',
-        postbackSafe: true,
-        partialRefresh: true
-    });
-});
 </script>
 {% endblock %}

@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Depo Pro v3 | Modern Yönetim</title>
-
+    <title>Depo Yönetim API</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', path='/logo.png') }}">
     <script src="https://unpkg.com/html5-qrcode"></script>
 
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -21,19 +21,25 @@
         body{ font-family: 'Plus Jakarta Sans', sans-serif; background:var(--bg); color:var(--text); display:flex; min-height:100vh; font-size:13px; overflow-x:hidden; }
         a{ text-decoration:none; }
         button, input, select, textarea{ font-family:inherit; outline:none; }
-        .sidebar{ width:240px; background:var(--sidebar); height:100vh; position:fixed; left:0; top:0; z-index:2000; padding:24px 15px; color:#fff; display:flex; flex-direction:column; }
-        .sidebar h2{ font-size:1.08rem; font-weight:800; margin-bottom:28px; letter-spacing:-0.5px; }
+        
+        /* SOL MENÜ VE İÇERİK - ANİMASYON EKLENDİ */
+        .sidebar{ width:240px; background:var(--sidebar); height:100vh; position:fixed; left:0; top:0; z-index:2000; padding:24px 15px; color:#fff; display:flex; flex-direction:column; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .sidebar h2{ font-size:1.08rem; font-weight:800; margin: 0; letter-spacing:-0.5px; }
         .sidebar a{ color:#94a3b8; display:flex; align-items:center; gap:10px; padding:11px 14px; border-radius:12px; margin-bottom:6px; font-weight:600; font-size:12px; transition:.18s; }
         .sidebar a:hover{ background:rgba(255,255,255,.08); color:#fff; }
         .sidebar a.active{ background:var(--primary); color:#fff; box-shadow: 0 4px 18px rgba(99,102,241,.35); }
         .sidebar a.sub-menu-link { padding-left: 32px; margin-top: -2px; margin-bottom: 6px; background: rgba(255, 255, 255, 0.03); }
-        .main-content{ width:calc(100% - 240px); margin-left:240px; padding:30px; display:flex; justify-content:center; }
+        
+        .main-content{ width:calc(100% - 240px); margin-left:240px; padding:30px; display:flex; justify-content:center; transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
         .container{ width:100%; max-width:1100px; }
         .card{ width:100%; background:#fff; border-radius:var(--radius); padding:24px; border:1px solid var(--border); box-shadow:var(--card-shadow); margin-bottom:20px; }
         label{ display:block; margin-bottom:6px; font-size:11px; font-weight:800; color:#64748b; letter-spacing:.4px; text-transform:uppercase; }
-        input, select, textarea{ width:100%; height:42px; border:1px solid var(--border); border-radius:11px; padding:0 14px; font-size:13px; background:#fff; color:var(--text); margin-bottom:5px; }
+        
+        /* Girdiler İçin Hafif Buz Mavisi Arka Plan */
+        input, select, textarea{ width:100%; height:42px; border:2px solid var(--border); border-radius:11px; padding:0 14px; font-size:13px; background:#f1f5f9 !important; color:var(--text); margin-bottom:5px; font-weight:600; }
         textarea{ min-height:100px; padding:12px 14px; resize:vertical; }
-        input:focus, select:focus, textarea:focus{ border-color:var(--primary); box-shadow: 0 0 0 4px rgba(99,102,241,.12); }
+        input:focus, select:focus, textarea:focus{ border-color:var(--primary) !important; box-shadow: 0 0 0 4px rgba(99,102,241,.12) !important; background:#fff !important; }
+        
         .btn{ border:none; cursor:pointer; border-radius:11px; height:42px; padding:0 18px; display:inline-flex; align-items:center; justify-content:center; gap:8px; font-size:13px; font-weight:800; transition:.18s; }
         .btn:hover{ transform:translateY(-1px); }
         .btn-primary{ background:var(--primary); color:#fff; }
@@ -43,27 +49,111 @@
         .overlay{ display:none; }
         #toast-container{ position:fixed; top:20px; right:20px; z-index:99999; }
         .toast{ min-width:260px; padding:13px 18px; border-radius:12px; color:#fff; font-size:12px; font-weight:700; margin-bottom:10px; box-shadow: 0 10px 25px rgba(0,0,0,.12); }
+        
+        /* Select2 Kapalı Alan Tasarımı ve Renklendirmesi */
         .select2-container{ width:100% !important; }
-        .select2-container--default .select2-selection--single{ height:42px !important; border-radius:11px !important; border:1px solid var(--border) !important; display:flex !important; align-items:center !important; padding-left:8px; background:#fff !important; }
-        .select2-selection__rendered{ line-height:40px !important; font-size:13px !important; }
+        .select2-container--default .select2-selection--single{ height:42px !important; border-radius:11px !important; border:2px solid var(--border) !important; display:flex !important; align-items:center !important; padding-left:8px; background:#f1f5f9 !important; }
+        .select2-selection__rendered{ line-height:40px !important; font-size:13px !important; color:var(--text) !important; font-weight:600 !important; }
         .select2-selection__arrow{ height:40px !important; }
-        .select2-dropdown{ border-radius:12px !important; border:1px solid var(--border) !important; overflow:hidden; }
+        .select2-container--default.select2-container--focus .select2-selection--single { border-color:var(--primary) !important; background:#fff !important; box-shadow: 0 0 0 4px rgba(99,102,241,.12) !important; }
+        
+        /* Select2 Açılır Menü Panel Tasarımı */
+        .select2-dropdown{ border-radius:12px !important; border:2px solid var(--border) !important; overflow:hidden; background-color:#f1f5f9 !important; box-shadow:0 10px 25px rgba(0,0,0,.08) !important; }
+        .select2-container--default .select2-results__options { background-color:#f1f5f9 !important; }
+        .select2-container--default .select2-results__option { padding:10px 14px !important; color:#334155 !important; font-weight:600; }
+        .select2-container--default .select2-results__option--highlighted[aria-selected] { background-color:var(--primary) !important; color:white !important; }
+        
         ::-webkit-scrollbar{ width:8px; height:8px; }
         ::-webkit-scrollbar-thumb{ background:#cbd5e1; border-radius:999px; }
         input, textarea, td, select{ text-transform:uppercase; }
         ::-placeholder{ text-transform:none; }
-        @media (max-width:768px){ body{ font-size:13px; } .sidebar{ transform:translateX(-240px); transition:.25s; } .sidebar.active{ transform:translateX(0); } .overlay.active{ display:block; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:1800; } .mobile-header{ display:flex; position:fixed; top:0; left:0; right:0; height:58px; background:var(--sidebar); color:#fff; z-index:1500; align-items:center; justify-content:space-between; padding:0 14px; } .main-content{ margin-left:0; width:100%; padding: 74px 12px 20px 12px; } .card{ padding:18px; border-radius:15px; } input, select, textarea, .btn, .select2-container .select2-selection--single{ height:46px !important; font-size:15px !important; border-radius:10px !important; } .select2-selection__rendered{ line-height:44px !important; } label{ font-size:10px; } div[style*="grid-template-columns"]{ grid-template-columns:1fr !important; gap:12px !important; } .kb-hidden{ display:none !important; } }
+        
+        /* =========================================
+           MASAÜSTÜ PANEL AÇ/KAPAT STİLLERİ
+           ========================================= */
+        .desktop-toggle-btn {
+            position: fixed;
+            top: 29px;
+            left: 195px; /* Menünün İÇİNDE, yazının hemen sağında */
+            background: rgba(255, 255, 255, 0.05); /* Koyu zemine uyumlu hafif saydamlık */
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            width: 32px;
+            height: 32px;
+            font-size: 14px;
+            cursor: pointer;
+            z-index: 2001;
+            transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s, background 0.2s, color 0.2s, border-color 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .desktop-toggle-btn:hover { 
+            background: rgba(255, 255, 255, 0.15); 
+            transform: scale(1.05); 
+        }
+
+        /* Panel Kapalıyken Tetiklenecek Sınıf (Masaüstü) */
+        @media (min-width: 769px) {
+            body.sidebar-collapsed .sidebar { transform: translateX(-240px); }
+            body.sidebar-collapsed .main-content { margin-left: 0; width: 100%; }
+            
+            /* Menü kapanınca buton dışarıda (beyaz alanda) kalacak şekilde tasarımı değişir */
+            body.sidebar-collapsed .desktop-toggle-btn {
+                left: 20px;
+                top: 25px;
+                background: #ffffff; 
+                color: var(--primary);
+                border: 2px solid var(--border);
+                box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            }
+            body.sidebar-collapsed .desktop-toggle-btn:hover {
+                border-color: var(--primary);
+            }
+        }
+
+        /* MOBİL GÖRÜNÜM UYARLAMALARI */
+        @media (max-width:768px){ 
+            body{ font-size:13px; } 
+            .desktop-toggle-btn { display: none !important; } /* Mobilde gizle */
+            .sidebar{ transform:translateX(-240px); transition:.25s; } 
+            .sidebar.active{ transform:translateX(0); } 
+            .overlay.active{ display:block; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:1800; } 
+            .mobile-header{ display:flex; position:fixed; top:0; left:0; right:0; height:58px; background:var(--sidebar); color:#fff; z-index:1500; align-items:center; justify-content:space-between; padding:0 14px; } 
+            .main-content{ margin-left:0; width:100%; padding: 74px 12px 20px 12px; } 
+            .card{ padding:18px; border-radius:15px; } 
+            input, select, textarea, .btn, .select2-container .select2-selection--single{ height:46px !important; font-size:15px !important; border-radius:10px !important; } 
+            .select2-selection__rendered{ line-height:44px !important; } label{ font-size:10px; } 
+            div[style*="grid-template-columns"]{ grid-template-columns:1fr !important; gap:12px !important; } 
+            .kb-hidden{ display:none !important; } 
+        }
     </style>
 </head>
 
 <body>
+    
+    <button class="desktop-toggle-btn" onclick="toggleDesktopMenu()" title="Menüyü Aç/Kapat">
+        <i class="fa-solid fa-bars"></i>
+    </button>
+
     <div class="mobile-header" id="m-header">
         <button onclick="toggleMenu()" style="background:var(--primary); color:#fff; border:none; border-radius:8px; padding:7px 11px; font-size:12px; font-weight:800; cursor:pointer;">☰ MENÜ</button>
-        <div style="font-weight:800; font-size:14px;">DEPO PRO</div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <img src="{{ url_for('static', path='/logo.png') }}" alt="Logo" style="width: 35px; height: 35px; object-fit: contain;">
+            
+        </div>
     </div>
+    
     <div class="overlay" id="overlay" onclick="toggleMenu()"></div>
+    
     <div class="sidebar" id="sidebar">
-        <h2>📦 DEPO YÖNETİM</h2>
+        <div style="display: flex; align-items: center; padding: 0 0 24px 0; gap: 12px;">
+            <img src="{{ url_for('static', path='/logo.png') }}" alt="Logo" style="width: 45px; height: 45px; object-fit: contain;">
+            <h2 style="font-size: 1.15rem;">DEPO API</h2> 
+        </div>
+        
         <a href="/stok-paneli/">📊 Genel Durum</a>
         <a href="/urun-listesi/" class="nav-link">📋 STOK LİSTESİ</a>
         {% if get_user(request).can_add_stock %}
@@ -80,6 +170,7 @@
         <a href="/yonetim/" class="nav-link" style="color:#f59e0b; margin-bottom: 2px;">⚙️ Yönetici Paneli</a>
         <a href="/raporlar" class="nav-link sub-menu-link" style="color:#e2e8f0;"><i class="fa-solid fa-chart-pie" style="font-size: 10px; color: #a0aec0;"></i> 📊 Raporlar Paneli</a>
         {% endif %}
+        
         <div style="margin-top:auto; padding-top:15px; border-top:1px solid rgba(255,255,255,.08);">
             <div style="padding:0 14px 10px;"><div style="color:#94a3b8; font-size:11px; font-weight:700;">{{ get_user(request).kullanici_adi }}</div></div>
             <a href="/logout" style="color:#f43f5e; font-size:11px; font-weight:800;">🚪 GÜVENLİ ÇIKIŞ</a>
@@ -95,7 +186,24 @@
     <div id="toast-container"></div>
 
     <script>
-        function toggleMenu(){ document.getElementById('sidebar').classList.toggle('active'); document.getElementById('overlay').classList.toggle('active'); }
+        // SİSTEM HAFIZASI: Sayfa yüklenince kullanıcının menü tercihini hatırla
+        if(localStorage.getItem('sidebar-collapsed') === 'true') {
+            document.body.classList.add('sidebar-collapsed');
+        }
+
+        // MASAÜSTÜ MENÜYÜ AÇ/KAPAT
+        function toggleDesktopMenu() {
+            document.body.classList.toggle('sidebar-collapsed');
+            // Yeni durumu tarayıcı hafızasına (localStorage) kaydet
+            localStorage.setItem('sidebar-collapsed', document.body.classList.contains('sidebar-collapsed'));
+        }
+
+        // MOBİL MENÜYÜ AÇ/KAPAT
+        function toggleMenu(){ 
+            document.getElementById('sidebar').classList.toggle('active'); 
+            document.getElementById('overlay').classList.toggle('active'); 
+        }
+
         function bildirim(mesaj, tip = 'success'){ const renk = tip === 'success' ? '#10b981' : '#f43f5e'; const toast = $(`<div class="toast" style="background:${renk}">${mesaj}</div>`); $('#toast-container').append(toast); setTimeout(() => { toast.fadeOut(300, () => toast.remove()); }, 3200); }
         $('.sidebar a').each(function(){ if(window.location.pathname === $(this).attr('href')){ $(this).addClass('active'); } });
         

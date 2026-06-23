@@ -91,20 +91,20 @@
                 <label>BARKOD NO</label>
                 <div style="padding: 14px; background: #f1f5f9; border-radius: 12px; font-weight: 800; color: #1e293b;">{{ urun.barkod }}</div>
             </div>
-            <div class="mb-3">
-                <label class="form-label fw-bold">📦 Ürün Adı</label>
-                <input type="text" id="detay_isim" class="form-control" value="{{ urun.isim }}" 
+            <div>
+                <label class="fw-bold">📦 ÜRÜN ADI</label>
+                <input type="text" id="detay_isim" value="{{ urun.isim }}" 
                     {% if not get_user(request).can_edit_product and get_user(request).rol_adi != 'ADMIN' %} readonly {% endif %}>
             </div>
 
-            <div class="mb-3">
-                <label class="form-label fw-bold">🔢 Lot No</label>
-                <input type="text" id="detay_lot" class="form-control" value="{{ urun.lot }}" 
+            <div>
+                <label class="fw-bold">🔢 LOT NO</label>
+                <input type="text" id="detay_lot" value="{{ urun.lot if urun.lot else '' }}" 
                     {% if not get_user(request).can_edit_product and get_user(request).rol_adi != 'ADMIN' %} readonly {% endif %}>
             </div>
             <div>
                 <label>KATEGORİ</label>
-                <select id="k" class="form-control">
+                <select id="k">
                     <option value="">Kategori Seçin</option>
                     {% for kat in kategoriler %}
                         <option value="{{ kat.ad }}" {% if urun.kategori and urun.kategori.ad == kat.ad %}selected{% endif %}>
@@ -124,6 +124,13 @@
                     {% endfor %}
                 </select>
             </div>
+            
+            <div>
+                <label class="fw-bold">🔢 KUTU İÇİ MİKTARI</label>
+                <input type="text" id="detay_kutu" value="{{ urun.kutu_ici if urun.kutu_ici else '' }}" 
+                    {% if not get_user(request).can_edit_product and get_user(request).rol_adi != 'ADMIN' %} readonly {% endif %} placeholder="Örn: 12, 24 veya -">
+            </div>
+
             <div style="background: #eef2ff; padding: 15px; border-radius: 16px; text-align: center; border: 2px solid #dbeafe;">
                 <label style="color: #6366f1;">MEVCUT STOK</label>
                 <div style="font-size: 1.8rem; font-weight: 900; color: #4f46e5;">{{ urun.miktar }} <small style="font-size: 12px;">ADET</small></div>
@@ -234,12 +241,14 @@
         const eskiLot = "{{ urun.lot }}"; 
         const yeniLot = document.getElementById('detay_lot').value; 
         
+        // kutu_ici verisi backend'e gönderilmek üzere veritabanı şemasına eklendi
         const data = {
             barkod: barkod,
             isim: document.getElementById('detay_isim').value,
             lot: yeniLot,
             kategori_ad: document.getElementById('k').value,
             yer: document.getElementById('yer').value,
+            kutu_ici: document.getElementById('detay_kutu').value, // Yeni sütun entegrasyonu
             miktar: parseInt("{{ urun.miktar }}"),
             islem_nedeni: "BİLGİ GÜNCELLEME"
         };
@@ -318,6 +327,3 @@ $(document).ready(function(){
 });
 </script>
 {% endblock %}
-
-
-

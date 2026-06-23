@@ -1,10 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
 
-
-
-
-
 <div class="card" style="max-width: 700px; margin: 0 auto; border-top: 8px solid #dc2626;">
     
     <h2 style="margin-top:0; color:#dc2626; font-size: 1.6rem; letter-spacing: -1px;">
@@ -14,11 +10,6 @@
     <p style="color:#64748b; margin-bottom:20px; font-weight: 500;">
         Sistemden ürün düşmek için barkod okutun veya listeden seçin.
     </p>
-
-
-
-
-
 
     <div style="display:flex; gap:10px; align-items:flex-end; margin-bottom:20px;">
 
@@ -68,10 +59,6 @@
 
     </div>
 
-
-
-    <!-- KAMERA -->
-
     <div id="reader-wrapper">
 
         <div id="reader"></div>
@@ -91,10 +78,6 @@
         </button>
 
     </div>
-
-
-
-    <!-- ÜRÜN BİLGİ -->
 
     <div style="
         display:grid;
@@ -117,23 +100,23 @@
                 ÜRÜN TANIMI
             </label>
 
-            <input 
-                type="text"
+            <select 
                 id="goster_isim"
-                readonly
-                placeholder="Barkod okutulmadı..."
                 style="
                     background:transparent;
                     border:none;
-                    border-bottom:2px solid #fca5a5;
+                    border-bottom:2px solid #e9b1b1;
                     font-weight:800;
                     color:#1e293b;
                     margin-bottom:0;
                     padding-left:0;
                     border-radius:0;
                     width:100%;
+                    outline: none;
                 "
             >
+                <option value="">-- BARKOD GİRİN --</option>
+            </select>
         </div>
 
         <div>
@@ -146,14 +129,11 @@
                 ÇIKILACAK LOTU SEÇİN
             </label>
 
-            <select id="l" style="width:100%;"></select>
+            <select id="l" style="width:100%;"><option value="">-- ÜRÜN SEÇİN --</option></select>
+            
         </div>
 
     </div>
-
-
-
-    <!-- MİKTAR -->
 
     <div style="
         display:grid;
@@ -218,10 +198,6 @@
 
     </div>
 
-
-
-    <!-- NOT -->
-
     <div>
 
         <label style="color:#475569;">
@@ -244,17 +220,12 @@
 
     </div>
 
-
-
-    <!-- BUTON -->
-
     <div style="display:flex; gap:10px;">
         <button onclick="sepeteEkle()" class="btn" style="flex:1; padding:15px; font-weight:800; background:#4f46e5; color:white; border-radius:14px; border:none; cursor:pointer;">➕ SEPETE EKLE</button>
         <button onclick="cikisYap()" class="btn" style="flex:1; padding:15px; font-weight:800; background:#dc2626; color:white; border-radius:14px; border:none; cursor:pointer;">🚀 İŞLEMİ TAMAMLA</button>
     </div>
 
 </div>
-
 
     <div id="sepet-alani" class="card shadow-sm border-0 mb-4" style="border-radius:16px; display:none; background:#ffffff; border:1px solid #e2e8f0;">
         <div class="card-body p-3">
@@ -276,17 +247,35 @@
     </div>
 
 
-
 <script src="https://unpkg.com/html5-qrcode"></script>
 
 <script>
+let barkodKayitlari = [];
 
 $(document).ready(function() {
+
+    function turkceMatcher(params, data) {
+        if ($.trim(params.term) === '') {
+            return data;
+        }
+        if (typeof data.text === 'undefined') {
+            return null;
+        }
+        
+        var aranan = params.term.toLocaleUpperCase('tr-TR');
+        var metin = data.text.toLocaleUpperCase('tr-TR');
+        
+        if (metin.indexOf(aranan) > -1) {
+            return data;
+        }
+        return null;
+    }
 
     $('#u').select2({
         placeholder: "Ürün seçin veya barkod okutun...",
         allowClear: true,
-        width: '100%'
+        width: '100%',
+        matcher: turkceMatcher
     });
 
     $('#l').select2({
@@ -298,74 +287,113 @@ $(document).ready(function() {
         tags: true,
         placeholder: "Sevk yeri veya müşteri seçin...",
         allowClear: true,
-        width: '100%'
+        width: '100%',
+        matcher: turkceMatcher
     });
 
+    // Otomatik lot kilitlemeyi kaldırdık. Sadece barkodu çeker.
     $('#u').on('change', function() {
         const barkod = $(this).val();
-        
-        // Seçilen opsiyon elementinin içindeki tüm data özelliklerini alıyoruz
-        const seciliOption = $(this).find(':selected');
-        const hedeflenenLot = seciliOption.data('lot') ? seciliOption.data('lot').toString().trim() : '-';
-
         if (barkod) {
-            // lotlariGetir fonksiyonuna artık hedeflenen lot bilgisini de gönderiyoruz
-            lotlariGetir(barkod, hedeflenenLot);
+            lotlariGetir(barkod);
         } else {
             formuSifirla();
         }
     });
 
+    // Ürün ismi değiştiğinde lot mantığı
+    $('#goster_isim').on('change', function() {
+        const secilenIsim = $(this).val();
+        const lotSelect = $('#l');
+        
+        lotSelect.empty();
+        $('#stok_bilgi').html('');
+        $('#m').val('');
+
+        if (!secilenIsim) {
+            lotSelect.append('<option value="">-- ÖNCE ÜRÜN SEÇİN --</option>');
+            lotSelect.trigger('change');
+            return;
+        }
+
+        const aitKayitlar = barkodKayitlari.filter(i => (i.isim || "İsimsiz Ürün") === secilenIsim);
+
+        if (aitKayitlar.length > 0) {
+            const siraliListe = aitKayitlar.sort((a, b) => a.miktar - b.miktar);
+
+            if (siraliListe.length === 1) {
+                // SADECE 1 LOT VARSA DİREKT SEÇ
+                const item = siraliListe[0];
+                const text = `LOT: ${item.lot || '-'} (Mevcut: ${item.miktar} Adet)`;
+                let opt = new Option(text, item.lot, true, true);
+                $(opt).data('stok', item.miktar);
+                lotSelect.append(opt);
+                lotSelect.trigger('change');
+            } else {
+                // BİRDEN FAZLA LOT VARSA KULLANICIYI SEÇİME ZORLA
+                lotSelect.append('<option value="">-- LOT SEÇİN --</option>');
+                siraliListe.forEach(item => {
+                    const text = `LOT: ${item.lot || '-'} (Mevcut: ${item.miktar} Adet)`;
+                    let opt = new Option(text, item.lot);
+                    $(opt).data('stok', item.miktar);
+                    lotSelect.append(opt);
+                });
+                lotSelect.trigger('change');
+            }
+        }
+    });
+
     $('#l').on('change', function() {
+        const seciliLot = $(this).find(':selected');
+        const miktar = seciliLot.data('stok');
 
-        const seciliLot =
-            $(this).find(':selected');
-
-        const miktar =
-            seciliLot.data('stok');
-
-        if (miktar !== undefined) {
-
-            $('#stok_bilgi')
-                .html(`⚠️ GÜNCEL STOK: ${miktar} ADET`);
-
-            $('#m')
-                .attr('max', miktar)
-                .focus();
+        // Boş seçim ("-- LOT SEÇİN --") yapıldığında stok bilgisini sil
+        if (miktar !== undefined && $(this).val() !== "") {
+            $('#stok_bilgi').html(`⚠️ GÜNCEL STOK: ${miktar} ADET`);
+            $('#m').attr('max', miktar).focus();
+        } else {
+            $('#stok_bilgi').html('');
         }
     });
 });
 
 
-
-async function lotlariGetir(barkod, hedeflenenLot = null) {
+async function lotlariGetir(barkod) {
     const lotSelect = $('#l');
+    const isimSelect = $('#goster_isim');
+    
     lotSelect.empty().append('<option value="">Yükleniyor...</option>');
+    isimSelect.empty().append('<option value="">Yükleniyor...</option>');
 
     try {
         const res = await fetch(`/barkod-detay/${barkod}`);
         const data = await res.json();
+        
+        isimSelect.empty();
         lotSelect.empty();
+        
+        barkodKayitlari = (data.liste && data.liste.length > 0) ? data.liste : [];
 
-        if (data.liste && data.liste.length > 0) {
-            $('#goster_isim').val(data.isim);
+        if (barkodKayitlari.length > 0) {
+            
+            const benzersizIsimler = [...new Set(
+                barkodKayitlari.map(i => i.isim || data.isim || "İsimsiz Ürün").filter(Boolean)
+            )];
 
-            data.liste.forEach(item => {
-                const text = `LOT: ${item.lot || '-'} (${item.miktar} Adet)`;
-                let opt = new Option(text, item.lot);
-                $(opt).data('stok', item.miktar);
-                lotSelect.append(opt);
+            // İlk seçeneği ekle (placeholder)
+            isimSelect.append(new Option("-- ÜRÜN ADI SEÇİN --", "", false, false));
+
+            benzersizIsimler.forEach(isim => {
+                isimSelect.append(new Option(isim, isim, false, false));
             });
 
-            // EĞER ÖZELLİKLE BİR LOT SEÇİLEREK GELİNDİYSE ONU AKTİF ET
-            if (hedeflenenLot) {
-                // Eğer listede tam eşleşen lot varsa onu seç, yoksa varsayılan ilk lot kalsın
-                if (lotSelect.find(`option[value="${hedeflenenLot}"]`).length > 0) {
-                    lotSelect.val(hedeflenenLot);
-                }
+            // SADECE 1 İSİM VARSA DİREKT SEÇ, BİRDEN FAZLAYSA SEÇTİR
+            if (benzersizIsimler.length === 1) {
+                isimSelect.val(benzersizIsimler[0]).trigger('change');
+            } else {
+                isimSelect.trigger('change');
+                lotSelect.empty().append('<option value="">-- ÜRÜN ADI SEÇİN --</option>').trigger('change');
             }
-
-            lotSelect.trigger('change');
 
         } else {
             bildirim("⚠️ Ürün bulunamadı!", "error");
@@ -375,24 +403,18 @@ async function lotlariGetir(barkod, hedeflenenLot = null) {
     } catch (e) {
         console.error(e);
         bildirim("Bağlantı hatası!", "error");
+        formuSifirla();
     }
 }
 
 
-
 function formuSifirla() {
-
-    $('#goster_isim').val('');
-
+    barkodKayitlari = [];
+    $('#goster_isim').empty().append('<option value="">-- BARKOD GİRİN --</option>');
     $('#stok_bilgi').html('');
-
-    $('#l')
-        .empty()
-        .trigger('change');
-
+    $('#l').empty().append('<option value="">-- ÜRÜN SEÇİN --</option>').trigger('change');
     $('#m').val('');
 }
-
 
 
 let sepet = [];
@@ -404,13 +426,14 @@ function sepeteEkle() {
     const miktar = parseInt($('#m').val());
     const maxStok = $('#l option:selected').data('stok');
 
-    if(!barkod || !lot || !miktar || miktar > maxStok) return bildirim("Hatalı ürün veya miktar!", "error");
+    if(!barkod || !isim || !lot || !miktar || miktar > maxStok) return bildirim("Hatalı ürün veya miktar!", "error");
     
-    sepet.push({ barkod, lot, miktar });
+    sepet.push({ barkod, isim, lot, miktar });
     $('#sepet-alani').show();
     $('#sepet-tbody').append(`<tr data-index="${sepet.length-1}"><td>${isim}</td><td>${lot}</td><td>${miktar}</td><td><button onclick="sepettenSil(${sepet.length-1})" class="btn btn-sm btn-danger">X</button></td></tr>`);
     
-    $('#m').val(''); $('#u').val('').trigger('change');
+    $('#m').val(''); 
+    $('#u').val('').trigger('change');
     bildirim("Sepete eklendi!");
 }
 
@@ -426,7 +449,7 @@ async function cikisYap() {
         method: 'POST', headers: {'Content-Type': 'application/json'}, 
         body: JSON.stringify({ 
             urunler: sepet, 
-            musteri: $('#n').val(), // Select2'deki seçilen veya yazılan değer
+            musteri: $('#n').val(),
             aciklama: $('#not').val() 
         })
     });
@@ -450,142 +473,73 @@ let torchEnabled = false;
 let zoomLevel = 2;
 let focusInterval = null;
 
-
-
 async function kameraKapat() {
-
     try {
-
         if (focusInterval) {
             clearInterval(focusInterval);
         }
-
         if (html5QrCode) {
-
             await html5QrCode.stop();
             await html5QrCode.clear();
         }
-
     } catch (e) {}
 
     html5QrCode = null;
     currentTrack = null;
     torchEnabled = false;
 
-    document.getElementById("reader-wrapper")
-        .style.display = "none";
-
-    document.getElementById("flashBtn")
-        .style.display = "none";
-
-    document.getElementById("zoomBtn")
-        .style.display = "none";
+    document.getElementById("reader-wrapper").style.display = "none";
+    document.getElementById("flashBtn").style.display = "none";
+    document.getElementById("zoomBtn").style.display = "none";
 }
 
-
-
 async function kameraAc() {
-
-    const wrapper =
-        document.getElementById("reader-wrapper");
-
+    const wrapper = document.getElementById("reader-wrapper");
     if (html5QrCode) {
         return kameraKapat();
     }
-
     wrapper.style.display = "block";
 
     try {
-
-        html5QrCode =
-            new Html5Qrcode("reader");
-
-        const devices =
-            await Html5Qrcode.getCameras();
-
+        html5QrCode = new Html5Qrcode("reader");
+        const devices = await Html5Qrcode.getCameras();
         if (!devices.length) {
-
             alert("Kamera bulunamadı");
             return;
         }
 
         let cameraId = devices[0].id;
-
-        const backCamera =
-            devices.find(device => {
-
-                const label =
-                    device.label.toLowerCase();
-
-                return (
-                    label.includes("back") ||
-                    label.includes("rear") ||
-                    label.includes("environment")
-                );
-            });
+        const backCamera = devices.find(device => {
+            const label = device.label.toLowerCase();
+            return (label.includes("back") || label.includes("rear") || label.includes("environment"));
+        });
 
         if (backCamera) {
             cameraId = backCamera.id;
         }
 
         await html5QrCode.start(
-
             cameraId,
-
             {
                 fps: 15,
-
                 disableFlip: true,
-
                 qrbox: (w, h) => {
-
-                    const size =
-                        Math.min(w, h) * 0.72;
-
-                    return {
-                        width: size,
-                        height: size
-                    };
+                    const size = Math.min(w, h) * 0.72;
+                    return { width: size, height: size };
                 },
-
                 aspectRatio: 1.777,
-
                 videoConstraints: {
-
-                    facingMode: {
-                        ideal: "environment"
-                    },
-
-                    width: {
-                        ideal: 1920
-                    },
-
-                    height: {
-                        ideal: 1080
-                    },
-
+                    facingMode: { ideal: "environment" },
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 },
                     advanced: [
-
-                        {
-                            focusMode: "continuous"
-                        },
-
-                        {
-                            sharpness: 1
-                        },
-
-                        {
-                            contrast: 1
-                        }
+                        { focusMode: "continuous" },
+                        { sharpness: 1 },
+                        { contrast: 1 }
                     ]
                 },
-
-                experimentalFeatures: {
-                    useBarCodeDetectorIfSupported: true
-                },
-
+                experimentalFeatures: { useBarCodeDetectorIfSupported: true },
                 formatsToSupport: [
-
                     Html5QrcodeSupportedFormats.CODE_128,
                     Html5QrcodeSupportedFormats.CODE_39,
                     Html5QrcodeSupportedFormats.EAN_13,
@@ -593,223 +547,117 @@ async function kameraAc() {
                     Html5QrcodeSupportedFormats.QR_CODE
                 ]
             },
-
             async (decodedText) => {
-
-                $('#u')
-                    .val(decodedText)
-                    .trigger('change');
-
-                if (navigator.vibrate) {
-                    navigator.vibrate(120);
-                }
-
+                $('#u').val(decodedText).trigger('change');
+                if (navigator.vibrate) navigator.vibrate(120);
                 kameraKapat();
             },
-
             () => {}
         );
 
-
-
         setTimeout(async () => {
-
             try {
+                const videoElement = document.querySelector("#reader video");
+                if (!videoElement?.srcObject) return;
 
-                const videoElement =
-                    document.querySelector("#reader video");
+                currentTrack = videoElement.srcObject.getVideoTracks()[0];
+                if (!currentTrack) return;
 
-                if (!videoElement?.srcObject)
-                    return;
-
-                currentTrack =
-                    videoElement.srcObject
-                    .getVideoTracks()[0];
-
-                if (!currentTrack)
-                    return;
-
-                const capabilities =
-                    currentTrack.getCapabilities();
+                const capabilities = currentTrack.getCapabilities();
 
                 if (capabilities.focusMode) {
-
                     try {
-
                         await currentTrack.applyConstraints({
-                            advanced: [
-                                {
-                                    focusMode: "continuous"
-                                }
-                            ]
+                            advanced: [{ focusMode: "continuous" }]
                         });
-
                     } catch (e) {}
                 }
 
                 if (capabilities.zoom) {
-
                     try {
-
-                        if (
-                            capabilities.zoom.max &&
-                            zoomLevel > capabilities.zoom.max
-                        ) {
-                            zoomLevel =
-                                capabilities.zoom.max;
+                        if (capabilities.zoom.max && zoomLevel > capabilities.zoom.max) {
+                            zoomLevel = capabilities.zoom.max;
                         }
-
                         await currentTrack.applyConstraints({
-                            advanced: [
-                                {
-                                    zoom: zoomLevel
-                                }
-                            ]
+                            advanced: [{ zoom: zoomLevel }]
                         });
-
-                        document.getElementById("zoomBtn")
-                            .style.display = "block";
-
+                        document.getElementById("zoomBtn").style.display = "block";
                     } catch (e) {}
                 }
 
                 if (capabilities.torch) {
-
-                    document.getElementById("flashBtn")
-                        .style.display = "block";
+                    document.getElementById("flashBtn").style.display = "block";
                 }
 
-                focusInterval =
-                    setInterval(async () => {
-
-                        try {
-
-                            if (!currentTrack)
-                                return;
-
-                            await currentTrack.applyConstraints({
-                                advanced: [
-                                    {
-                                        focusMode: "continuous"
-                                    }
-                                ]
-                            });
-
-                        } catch (e) {}
-
-                    }, 2500);
+                focusInterval = setInterval(async () => {
+                    try {
+                        if (!currentTrack) return;
+                        await currentTrack.applyConstraints({
+                            advanced: [{ focusMode: "continuous" }]
+                        });
+                    } catch (e) {}
+                }, 2500);
 
             } catch (e) {
-
                 console.log(e);
             }
-
         }, 1000);
 
     } catch (err) {
-
         console.error(err);
-
         alert("Kamera hatası: " + err);
-
         kameraKapat();
     }
 }
 
-
-
 async function flashDegistir() {
-
     if (!currentTrack) return;
-
     try {
-
         torchEnabled = !torchEnabled;
-
         await currentTrack.applyConstraints({
-            advanced: [
-                {
-                    torch: torchEnabled
-                }
-            ]
+            advanced: [{ torch: torchEnabled }]
         });
-
-        document.getElementById("flashBtn")
-            .innerHTML =
-            torchEnabled
-                ? "🔦 Flash Kapat"
-                : "💡 Flash Aç";
-
+        document.getElementById("flashBtn").innerHTML = torchEnabled ? "🔦 Flash Kapat" : "💡 Flash Aç";
     } catch (e) {
-
         console.log("Torch desteklenmiyor", e);
     }
 }
 
-
-
 async function zoomDegistir() {
-
     if (!currentTrack) return;
-
     try {
-
-        const capabilities =
-            currentTrack.getCapabilities();
-
-        if (!capabilities.zoom)
-            return;
+        const capabilities = currentTrack.getCapabilities();
+        if (!capabilities.zoom) return;
 
         if (zoomLevel === 2) {
             zoomLevel = 3;
-        }
-        else if (zoomLevel === 3) {
+        } else if (zoomLevel === 3) {
             zoomLevel = 1;
-        }
-        else {
+        } else {
             zoomLevel = 2;
         }
 
-        if (
-            capabilities.zoom.max &&
-            zoomLevel > capabilities.zoom.max
-        ) {
+        if (capabilities.zoom.max && zoomLevel > capabilities.zoom.max) {
             zoomLevel = capabilities.zoom.max;
         }
 
         await currentTrack.applyConstraints({
-            advanced: [
-                {
-                    zoom: zoomLevel
-                }
-            ]
+            advanced: [{ zoom: zoomLevel }]
         });
 
         try {
-
             await currentTrack.applyConstraints({
-                advanced: [
-                    {
-                        focusMode: "continuous"
-                    }
-                ]
+                advanced: [{ focusMode: "continuous" }]
             });
-
         } catch (e) {}
 
-        document.getElementById("zoomBtn")
-            .innerHTML =
-            `🔍 ${zoomLevel}x`;
-
+        document.getElementById("zoomBtn").innerHTML = `🔍 ${zoomLevel}x`;
     } catch (e) {
-
         console.log("Zoom desteklenmiyor", e);
     }
 }
 
 </script>
-
-
 
 <style>
 
@@ -879,9 +727,6 @@ async function zoomDegistir() {
     }
 }
 
-
-
-
 /* Sepet Tablosu Düzenlemeleri */
 #sepet-alani table {
     width: 100%;
@@ -894,13 +739,13 @@ async function zoomDegistir() {
     color: #475569;
     font-size: 0.85rem;
     font-weight: 700;
-    text-align: center; /* Başlıkları ortala */
+    text-align: center;
     padding: 10px;
 }
 
 #sepet-tbody td {
     padding: 12px 10px;
-    text-align: center; /* İçeriği ortala */
+    text-align: center;
     vertical-align: middle;
     border-bottom: 1px solid #e2e8f0;
     font-size: 0.9rem;
@@ -920,6 +765,48 @@ async function zoomDegistir() {
 }
 
 
+
+
+/* Select2 Kutusu İçindeki Yazı Rengi ve Kalınlığı */
+.select2-container--default .select2-selection--single .select2-selection__rendered,
+.select2-container--default .select2-selection--multiple .select2-selection__rendered {
+    color: #334155 !important;
+    font-weight: 600 !important;
+}
+
+/* Select2 Sağdaki Ok İşaretini Ortalama */
+.select2-container--default .select2-selection--single .select2-selection__arrow {
+    height: 100% !important;
+    top: 0 !important;
+}
+
+
+
+/* Inputlara tıklandığında (focus) etrafında canlı mavi bir ışık yansısın */
+.select2-container--focus .select2-selection--single,
+.select2-container--focus .select2-selection--multiple,
+input:focus, textarea:focus {
+    border-color: #6366f1 !important;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2) !important;
+    outline: none !important;
+}
+
+/* Açılan listenin ana paneli */
+.select2-container--default .select2-results__options {
+    background-color: #adade6 !important; /* Açılır listenin arka planı */
+}
+
+/* Seçili olan (üzerine gelinen) öğenin rengi */
+.select2-container--default .select2-results__option--highlighted[aria-selected] {
+    background-color: #6366f1 !important; /* Senin butonlarının o canlı mor/mavi tonu */
+    color: white !important;
+}
+
+/* Liste içindeki normal öğelerin rengi */
+.select2-container--default .select2-results__option {
+    color: #1e293b !important;
+    padding: 10px 15px !important; /* Listeyi biraz daha ferahlatır */
+}
 
 
 

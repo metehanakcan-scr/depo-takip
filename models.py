@@ -21,6 +21,7 @@ class UrunModel(Base):
     kategori_id = Column(Integer, ForeignKey("kategoriler.id"))
     kategori = relationship("Kategori", back_populates="urunler")
     yer = Column(String, nullable=True)
+    kutu_ici = Column(String, nullable=True)
     
 
 class DepoYeri(Base):
@@ -91,3 +92,4 @@ class İslem_nedeni(Base):
     __tablename__ = "islem_nedenleri"
     id = Column(Integer, primary_key=True, index=True)
     ad = Column(String, unique=True, index=True) 
+

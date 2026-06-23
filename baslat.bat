@@ -11,6 +11,9 @@ start "FastAPI_Sunucu" /min cmd /c "cd /d C:\Users\USER\Documents\depo_api && py
 echo Ngrok tuneli aciliyor...
 start "Ngrok_Tunel" /min cmd /c "cd /d C:\Users\USER\Documents\ngrok-v3-stable-windows-amd64 && ngrok http 8000"
 
+
+
+
 :: 3. ADIM: Bekleme ve Tarayıcı Açma
 :: Sunucunun tamamen ayağa kalkması ve veritabanı bağlantısı için 5 saniye idealdir.
 echo Sunucunun uyanmasi bekleniyor (7 sn)...

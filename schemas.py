@@ -13,6 +13,7 @@ class UrunSema(BaseModel):
     yer: Optional[str] = None
     musteri_ad: Optional[str] = None
     islem_tipi: Optional[str] = "Giriş"
+    kutu_ici : Optional[str] = None
 
 
 from pydantic import BaseModel

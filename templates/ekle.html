@@ -2,358 +2,142 @@
 {% block content %}
 
 <div class="card" style="max-width: 600px; margin: auto; border-top: 5px solid var(--primary);">
-    
+
     <h3 style="margin-top: 0;">
         ➕ STOK GİRİŞİ / YENİ KAYIT
     </h3>
 
-    <div style="
-        background:#f1f5f9;
-        padding:15px;
-        border-radius:12px;
-        margin:15px 0;
-    ">
-        <label style="
-            color:var(--primary);
-            font-size:11px;
-        ">
+    <div style="background:#f1f5f9; padding:15px; border-radius:12px; margin:15px 0;">
+        <label style="color:var(--primary); font-size:11px;">
             MEVCUT ÜRÜN SEÇ VEYA ARA (HIZLI DOLDUR)
         </label>
 
         <select id="hizli_secim" style="width:100%;">
-
             <option value=""></option>
-
             {% for u in urunler %}
-
-            <option 
+            <option
                 value="{{ u.barkod }}"
                 data-isim="{{ u.isim }}"
                 data-lot="{{ u.lot if u.lot else '' }}"
                 data-kat="{{ u.kategori.ad if u.kategori else 'GENEL' }}"
                 data-yer="{{ u.yer if u.yer else '' }}"
             >
-                {{ u.isim }} 
-                --- LOT: {{ u.lot if u.lot else '-' }}
+                {{ u.isim }} --- LOT: {{ u.lot if u.lot else '-' }}
             </option>
-
             {% endfor %}
         </select>
     </div>
 
-
-
-    <!-- BARKOD -->
-    <div style="
-        display:flex;
-        gap:10px;
-        align-items:flex-end;
-        margin-bottom:15px;
-    ">
-
+    <div style="display:flex; gap:10px; align-items:flex-end; margin-bottom:15px;">
         <div style="flex:1;">
-
             <label>BARKOD</label>
-
-            <input 
-                type="text"
-                id="b"
-                placeholder="Barkod okutun veya yazın..."
-                style="margin-bottom:0;"
-                enterkeyhint="next"
-            >
+            <input type="text" id="b" placeholder="Barkod okutun veya yazın..."
+                   style="margin-bottom:0;" enterkeyhint="next">
         </div>
-
-        <button 
-            onclick="kameraAc()"
-            class="btn"
-            style="
-                background:#6366f1;
-                color:white;
-                height:38px;
-                padding:0 15px;
-                border-radius:8px;
-            "
-        >
+        <button onclick="kameraAc()" class="btn"
+                style="background:#6366f1; color:white; height:42px; padding:0 15px; border-radius:11px;">
             📷 Tara
         </button>
     </div>
 
+    <div id="reader-wrapper" style="width:100%; max-width:340px; margin:14px auto; position:relative; display:none;">
+        <div id="reader" style="width:100%; border-radius:16px; overflow:hidden; border:2px solid #6366f1; background:#000;" playsinline></div>
 
-
-    <!-- KAMERA -->
-    <div id="reader-wrapper" style="
-        width:100%;
-        max-width:340px;
-        margin:14px auto;
-        position:relative;
-        display:none;
-    ">
-
-        <div id="reader" style="
-            width:100%;
-            border-radius:16px;
-            overflow:hidden;
-            border:2px solid #6366f1;
-            background:#000;
-        " playsinline></div>
-
-
-        <!-- FLASH -->
-        <button 
-            id="flashBtn"
-            onclick="flashDegistir()"
-            style="
-                display:none;
-                position:absolute;
-                bottom:10px;
-                left:50%;
-                transform:translateX(-50%);
-                z-index:999;
-
-                border:none;
-                border-radius:999px;
-
-                padding:8px 14px;
-
-                background:rgba(0,0,0,.75);
-                color:#fff;
-
-                font-size:13px;
-                font-weight:600;
-
-                backdrop-filter:blur(6px);
-            "
-        >
+        <button id="flashBtn" onclick="flashDegistir()"
+            style="display:none; position:absolute; bottom:10px; left:50%; transform:translateX(-50%); z-index:999; border:none; border-radius:999px; padding:8px 14px; background:rgba(0,0,0,.75); color:#fff; font-size:13px; font-weight:600; backdrop-filter:blur(6px);">
             💡 Flash Aç
         </button>
 
-
-        <!-- ZOOM -->
-        <button 
-            id="zoomBtn"
-            onclick="zoomDegistir()"
-            style="
-                display:none;
-                position:absolute;
-                top:10px;
-                right:10px;
-                z-index:999;
-
-                border:none;
-                border-radius:999px;
-
-                padding:8px 12px;
-
-                background:rgba(0,0,0,.75);
-                color:#fff;
-
-                font-size:13px;
-                font-weight:600;
-
-                backdrop-filter:blur(6px);
-            "
-        >
+        <button id="zoomBtn" onclick="zoomDegistir()"
+            style="display:none; position:absolute; top:10px; right:10px; z-index:999; border:none; border-radius:999px; padding:8px 12px; background:rgba(0,0,0,.75); color:#fff; font-size:13px; font-weight:600; backdrop-filter:blur(6px);">
             🔍 2x
         </button>
-
     </div>
 
-
-
-    <!-- ÜRÜN ADI -->
-    <div style="
-        display:grid;
-        grid-template-columns:1fr;
-        gap:12px;
-        margin-bottom:15px;
-    ">
-
+    <div style="display:grid; grid-template-columns:1fr; gap:12px; margin-bottom:15px;">
         <div>
-
-            <label>ÜRÜN ADI</label>
-
-            <input 
-                type="text"
-                id="n"
-                placeholder="Ürün adını girin..."
-                enterkeyhint="next"
-            >
+            <label>ÜRÜN ADI (Aynı barkodda birden fazla olabilir)</label>
+            <select id="n" style="width:100%;">
+                <option value="">-- BARKOD GİRİN VEYA OKUTUN --</option>
+            </select>
+        </div>
+        <div id="yeni_isim_div" style="display:none;">
+            <label style="color:#4f46e5; font-weight:800;">✨ YENİ ÜRÜN ADI (İLK KEZ KAYIT)</label>
+            <input type="text" id="isim_input" placeholder="Yeni ürünün adını yazın..." enterkeyhint="next" style="border: 2px solid #6366f1; background: #eef2ff !important;">
         </div>
     </div>
 
-
-
-    <!-- LOT -->
-    <div style="
-        display:grid;
-        grid-template-columns:1fr 1fr;
-        gap:12px;
-        margin-bottom:15px;
-    ">
-
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:15px;">
         <div>
-
             <label>LOT SEÇİMİ</label>
-
-            <select 
-                id="lot_select"
-                style="width:100%;"
-                onchange="lotSecildi(this.value)"
-            >
-                <option value="">
-                    -- BARKOD GİRİN --
-                </option>
+            <select id="lot_select" style="width:100%;" onchange="lotSecildi(this.value)">
+                <option value="">-- ÜRÜN SEÇİN --</option>
             </select>
         </div>
-
-
-        <div id="yeni_lot_div">
-
+        <div id="yeni_lot_div" style="display:none;">
             <label>YENİ LOT NO</label>
-
-            <input 
-                type="text"
-                id="lot_input"
-                placeholder="Lot No girin..."
-                enterkeyhint="next"
-            >
+            <input type="text" id="lot_input" placeholder="Lot No girin..." enterkeyhint="next">
         </div>
     </div>
 
-
-
-    <!-- KATEGORİ -->
-    <div style="
-        display:grid;
-        grid-template-columns:1fr 1fr;
-        gap:12px;
-        margin-bottom:15px;
-    ">
-
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:15px;">
         <div>
-
-            <label>KATEGORİ</label>
-
-            <select id="k" style="width:100%;">
-
-                <option value=""></option>
-
-                {% for kat in kategoriler %}
-                    <option value="{{ kat.ad }}">
-                        {{ kat.ad }}
-                    </option>
-                {% endfor %}
-            </select>
-        </div>
-
-
-        <div>
-
             <label>MİKTAR</label>
-
-            <input 
-                type="number"
-                inputmode="decimal"
-                id="m"
-                placeholder="Miktar..."
-                min="1"
-                enterkeyhint="next"
-            >
+            <input type="number" inputmode="decimal" id="m" placeholder="Miktar..." min="1" enterkeyhint="next">
+        </div>
+        <div>
+            <label>KUTU İÇİ (OPSİYONEL)</label>
+            <input type="text" id="kutu_ici" placeholder="Örn: 12, 24..." enterkeyhint="next">
         </div>
     </div>
 
-
-
-    <!-- İŞLEM -->
-    <div style="
-        display:grid;
-        grid-template-columns:1fr 1fr;
-        gap:12px;
-        margin-bottom:15px;
-    ">
-
-        <div>
-
-            <label>İŞLEM NEDENİ</label>
-
-            <select id="islem_nedeni" style="width:100%;">
-
-                <option value="SATIN ALMA">
-                    SATIN ALMA
-                </option>
-
-                <option value="İADE GELEN">
-                    İADE GELEN
-                </option>
-
-                <option value="SAYIM FAZLASI">
-                    SAYIM FAZLASI
-                </option>
-
-                <option value="TRANSFER">
-                    TRANSFER
-                </option>
-
-                <option value="DİĞER">
-                    DİĞER
-                </option>
-            </select>
-        </div>
-
-
-        <div>
-
-            <label>NOT (OPSİYONEL)</label>
-
-            <input 
-                type="text"
-                id="not_alani"
-                placeholder="Ek bilgi..."
-                enterkeyhint="next"
-            >
-        </div>
-    </div>
-
-
-
-    <!-- RAF -->
-    <div style="margin-bottom:20px;">
-
-        <label>RAF / YER</label>
-
-        <select id="y" style="width:100%;">
-
+    <div style="margin-bottom:15px;">
+        <label>KATEGORİ</label>
+        <select id="k" style="width:100%;">
             <option value=""></option>
-
-            {% for y in yerler %}
-                <option value="{{ y.ad }}">
-                    {{ y.ad }}
-                </option>
+            {% for kat in kategoriler %}
+                <option value="{{ kat.ad }}">{{ kat.ad }}</option>
             {% endfor %}
         </select>
     </div>
 
+    <div style="margin-bottom:15px;">
+        <label>RAF / YER</label>
+        <select id="y" style="width:100%;">
+            <option value=""></option>
+            {% for y in yerler %}
+                <option value="{{ y.ad }}">{{ y.ad }}</option>
+            {% endfor %}
+        </select>
+    </div>
 
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px;">
+        <div>
+            <label>İŞLEM NEDENİ</label>
+            <select id="islem_nedeni" style="width:100%;">
+                <option value="SATIN ALMA">SATIN ALMA</option>
+                <option value="İADE GELEN">İADE GELEN</option>
+                <option value="SAYIM FAZLASI">SAYIM FAZLASI</option>
+                <option value="TRANSFER">TRANSFER</option>
+                <option value="DİĞER">DİĞER</option>
+            </select>
+        </div>
+        <div>
+            <label>NOT (OPSİYONEL)</label>
+            <input type="text" id="not_alani" placeholder="Ek bilgi..." enterkeyhint="next">
+        </div>
+    </div>
 
-    <!-- KAYDET -->
-    <button 
-        onclick="kaydet()"
-        class="btn btn-primary"
-        style="
-            width:100%;
-            height:50px;
-            font-weight:bold;
-            font-size:1rem;
-        "
-    >
+    <button onclick="kaydet()" class="btn btn-primary"
+            style="width:100%; height:50px; font-weight:bold; font-size:1rem;">
         📦 STOĞA KAYDET
     </button>
 </div>
 
-
-
 <script>
+
+// Barkoda göre çekilen tüm kayıtları burada tutuyoruz
+let barkodKayitlari = [];
 
 $(document).ready(function() {
 
@@ -362,200 +146,188 @@ $(document).ready(function() {
         allowClear: true
     });
 
-    $('#islem_nedeni').select2({
+    $('#n').select2({
         tags: true,
-        placeholder: "NEDEN SEÇİN",
+        placeholder: "ÜRÜN ADI SEÇİN VEYA YAZIN",
         width: '100%'
     });
 
-    $('#k').select2({
-        tags: true,
-        allowClear: true,
-        width: '100%'
-    });
+    $('#islem_nedeni').select2({ tags: true, placeholder: "NEDEN SEÇİN", width: '100%' });
+    $('#k').select2({ tags: true, allowClear: true, width: '100%' });
+    $('#y').select2({ tags: true, allowClear: true, width: '100%' });
+    $('#lot_select').select2({ width: '100%' });
 
-    $('#y').select2({
-        tags: true,
-        allowClear: true,
-        width: '100%'
-    });
-
-    $('#lot_select').select2({
-        width: '100%'
-    });
-
-    $('#b').on('change input', function() {
-
-        const girilenBarkod =
-            $(this).val().trim();
-
-        if(!girilenBarkod)
-            return formuTemizle();
-
-        lotlariGetir(girilenBarkod);
-    });
-
-    $('#hizli_secim').on(
-        'select2:select',
-        function (e) {
-
-            const barkod =
-                $(e.params.data.element).val();
-
-            $('#b')
-                .val(barkod)
-                .trigger('change');
+    // --- YENİ BARKOD DİNLEYİCİSİ (SADECE ENTER) ---
+    $('#b').on('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault(); // Enter'ın sayfayı yenilemesini engeller
+            
+            const girilenBarkod = $(this).val().trim();
+            
+            // Eğer kutu boşken Enter'a basılırsa alt tarafı temizle
+            if (!girilenBarkod) {
+                return formuTemizle();
+            }
+            
+            // Doluysa veritabanında ara
+            lotlariGetir(girilenBarkod);
         }
-    );
+    });
+
+    // Kutu elle tamamen silindiğinde anında temizlesin
+    $('#b').on('input', function() {
+        if ($(this).val().trim() === '') {
+            formuTemizle();
+        }
+    });
+    // ----------------------------------------------
+
+    // Ürün adı seçilince o isme ait lotları doldur
+    $('#n').on('select2:select', function () {
+        urunSecildi($(this).val());
+    });
+
+    // Hızlı seçim → barkodu doldur ve direkt lotları getir (Enter simülasyonu)
+    $('#hizli_secim').on('select2:select', function (e) {
+        const barkod = $(e.params.data.element).val();
+        $('#b').val(barkod);
+        lotlariGetir(barkod);
+    });
 });
 
 
-
 async function lotlariGetir(barkod) {
-
+    const isimSelect = $('#n');
     const lotSelect = $('#lot_select');
 
-    lotSelect
-        .empty()
-        .append('<option value="">Yükleniyor...</option>');
+    lotSelect.empty().append('<option value="">Yükleniyor...</option>').trigger('change');
 
     try {
+        const res = await fetch(`/barkod-detay/${barkod}`);
+        const data = await res.json();
 
-        const res =
-            await fetch(`/barkod-detay/${barkod}`);
+        barkodKayitlari = (data.liste && data.liste.length > 0) ? data.liste : [];
 
-        const data =
-            await res.json();
+        isimSelect.empty();
 
-        lotSelect.empty();
+        if (barkodKayitlari.length > 0) {
+            const benzersizIsimler = [...new Set(
+                barkodKayitlari.map(i => i.isim).filter(Boolean)
+            )];
 
-        if (data.liste && data.liste.length > 0) {
+            isimSelect.append(new Option("-- ÜRÜN ADI SEÇİN --", "", false, false));
 
-            $('#n')
-                .val(data.isim)
-                .prop('readonly', true)
-                .css('background-color', '#f1f5f9');
-
-            data.liste.forEach(item => {
-
-                let text =
-                    `LOT: ${item.lot || '-'} (Mevcut: ${item.miktar} Adet)`;
-
-                lotSelect.append(
-                    new Option(text, item.lot, false, false)
-                );
-
-                lotSelect
-                    .find(`option[value="${item.lot}"]`)
-                    .data('item', item);
+            benzersizIsimler.forEach(isim => {
+                isimSelect.append(new Option(isim, isim, false, false));
             });
 
-            lotSelect.append(
-                new Option(
-                    "➕ YENİ LOT EKLE...",
-                    "YENI_LOT",
-                    false,
-                    false
-                )
-            );
+            // Yeni ürün ekleme seçeneği
+            isimSelect.append(new Option("➕ YENİ ÜRÜN ADI EKLE...", "YENI_URUN", false, false));
 
-            lotSelect.trigger('change');
+            if (benzersizIsimler.length === 1) {
+                isimSelect.val(benzersizIsimler[0]).trigger('change');
+                urunSecildi(benzersizIsimler[0]);
+            } else {
+                isimSelect.trigger('change');
+                lotSelect.empty()
+                    .append('<option value="">-- ÜRÜN ADI SEÇİN --</option>')
+                    .trigger('change');
+            }
 
         } else {
-
-            $('#n')
-                .prop('readonly', false)
-                .css('background-color', '#fff');
-
-            lotSelect.append(
-                new Option(
-                    "YENİ ÜRÜN / YENİ LOT",
-                    "YENI_LOT",
-                    true,
-                    true
-                )
-            );
-
-            lotSelect.trigger('change');
+            // Hiç kayıt yok → tamamen yeni ürün/lot (Otomatik Yeni Ürün inputu açılır)
+            isimSelect.append(new Option("➕ YENİ ÜRÜN ADI GİRİN", "YENI_URUN", true, true)).trigger('change');
+            urunSecildi("YENI_URUN");
         }
 
     } catch (e) {
-
         console.error("Hata:", e);
-
-        lotSelect
-            .empty()
-            .append('<option value="YENI_LOT">Yeni Kayıt</option>');
+        barkodKayitlari = [];
+        isimSelect.empty()
+            .append(new Option("➕ YENİ ÜRÜN ADI GİRİN", "YENI_URUN", true, true))
+            .trigger('change');
+        urunSecildi("YENI_URUN");
     }
 }
 
 
+// Ürün adı seçilince o isme ait lotları listele
+function urunSecildi(secilenIsim) {
+    const lotSelect = $('#lot_select');
+    lotSelect.empty();
+
+    // Yeni ürün adı ekleme durumu tetiklendiyse Input alanını göster
+    if (secilenIsim === "YENI_URUN" || secilenIsim === "") {
+        $('#yeni_isim_div').show();
+        lotSelect.append(new Option("YENİ ÜRÜN / YENİ LOT", "YENI_LOT", true, true)).trigger('change');
+        $('#yeni_lot_div').show();
+        $('#k, #y').prop('disabled', false).val(null).trigger('change');
+        $('#isim_input').val('').focus();
+        return;
+    }
+
+    // Mevcut ürün seçildiyse Input alanını gizle
+    $('#yeni_isim_div').hide();
+
+    // Bu isme ait kayıtları filtrele
+    const aitKayitlar = barkodKayitlari.filter(i => i.isim === secilenIsim);
+
+    if (aitKayitlar.length > 0) {
+        aitKayitlar.forEach(item => {
+            const text = `LOT: ${item.lot || '-'} (Mevcut: ${item.miktar} Adet)`;
+            lotSelect.append(new Option(text, item.lot, false, false));
+            lotSelect.find(`option[value="${item.lot}"]`).data('item', item);
+        });
+    }
+
+    // Bu ürüne yeni lot ekleme seçeneği
+    lotSelect.append(new Option("➕ YENİ LOT EKLE...", "YENI_LOT", false, false));
+    lotSelect.trigger('change');
+}
+
 
 function lotSecildi(val) {
-
     const yeniLotInput = $('#lot_input');
     const kategoriSelect = $('#k');
     const yerSelect = $('#y');
+    const kutuIciInput = $('#kutu_ici');
 
     if (val === "YENI_LOT" || val === "") {
-
         $('#yeni_lot_div').show();
-
         yeniLotInput.val('').focus();
-
-        kategoriSelect
-            .prop('disabled', false)
-            .val(null)
-            .trigger('change');
-
-        yerSelect
-            .prop('disabled', false)
-            .val(null)
-            .trigger('change');
+        kategoriSelect.prop('disabled', false).val(null).trigger('change');
+        yerSelect.prop('disabled', false).val(null).trigger('change');
+        kutuIciInput.val(''); // Yeni lotta kutu içini boşalt
 
     } else {
-
         $('#yeni_lot_div').hide();
-
-        const seciliData =
-            $('#lot_select option:selected').data('item');
+        const seciliData = $('#lot_select option:selected').data('item');
 
         if (seciliData) {
-
-            kategoriSelect
-                .val(seciliData.kat)
-                .trigger('change')
-                .prop('disabled', true);
-
-            yerSelect
-                .val(seciliData.yer)
-                .trigger('change')
-                .prop('disabled', true);
-
+            kategoriSelect.val(seciliData.kat).trigger('change').prop('disabled', true);
+            yerSelect.val(seciliData.yer).trigger('change').prop('disabled', true);
+            kutuIciInput.val(seciliData.kutu_ici || '');
             yeniLotInput.val(val);
         }
     }
 }
 
 
-
 function formuTemizle() {
+    barkodKayitlari = [];
 
-    $('#b, #n, #lot_input, #m, #not_alani').val('');
+    $('#lot_input, #isim_input, #m, #not_alani, #kutu_ici').val('');
+    $('#yeni_isim_div, #yeni_lot_div').hide();
 
-    $('#n')
-        .prop('readonly', false)
-        .css('background-color', '#fff');
-
-    $('#k, #y')
-        .prop('disabled', false)
-        .val(null)
+    $('#n').empty()
+        .append('<option value="">-- BARKOD GİRİN VEYA OKUTUN --</option>')
         .trigger('change');
 
-    $('#lot_select')
-        .empty()
-        .append('<option value="">-- BARKOD GİRİN --</option>')
+    $('#lot_select').empty()
+        .append('<option value="">-- ÜRÜN SEÇİN --</option>')
         .trigger('change');
+
+    $('#k, #y').prop('disabled', false).val(null).trigger('change');
 }
 
 
@@ -566,134 +338,62 @@ let torchEnabled = false;
 let zoomLevel = 2;
 let focusInterval = null;
 
-
-
 async function kameraAc() {
-
-    const readerDiv =
-        document.getElementById('reader-wrapper');
+    const readerDiv = document.getElementById('reader-wrapper');
 
     if (html5QrCode) {
-
         try {
-
-            if (focusInterval) {
-                clearInterval(focusInterval);
-            }
-
+            if (focusInterval) clearInterval(focusInterval);
             await html5QrCode.stop();
             await html5QrCode.clear();
-
         } catch (e) {}
-
         html5QrCode = null;
         currentTrack = null;
-
         readerDiv.style.display = 'none';
-
         return;
     }
 
     readerDiv.style.display = 'block';
 
     setTimeout(async () => {
-
         try {
-
-            html5QrCode =
-                new Html5Qrcode("reader");
-
-            const devices =
-                await Html5Qrcode.getCameras();
+            html5QrCode = new Html5Qrcode("reader");
+            const devices = await Html5Qrcode.getCameras();
 
             if (!devices || devices.length === 0) {
-
                 alert("Kamera bulunamadı");
                 return;
             }
 
             let cameraId = devices[0].id;
-
-            const backCamera =
-                devices.find(device => {
-
-                    const label =
-                        device.label.toLowerCase();
-
-                    return (
-                        label.includes("back") ||
-                        label.includes("rear") ||
-                        label.includes("environment")
-                    );
-                });
-
-            if (backCamera) {
-                cameraId = backCamera.id;
-            }
+            const backCamera = devices.find(device => {
+                const label = device.label.toLowerCase();
+                return label.includes("back") || label.includes("rear") || label.includes("environment");
+            });
+            if (backCamera) cameraId = backCamera.id;
 
             await html5QrCode.start(
-
                 cameraId,
-
                 {
                     fps: 15,
-
                     disableFlip: true,
-
-                    qrbox: function(
-                        viewfinderWidth,
-                        viewfinderHeight
-                    ) {
-
-                        let size = Math.min(
-                            viewfinderWidth,
-                            viewfinderHeight
-                        ) * 0.72;
-
-                        return {
-                            width: size,
-                            height: size
-                        };
+                    qrbox: function(viewfinderWidth, viewfinderHeight) {
+                        let size = Math.min(viewfinderWidth, viewfinderHeight) * 0.72;
+                        return { width: size, height: size };
                     },
-
                     aspectRatio: 1.777,
-
                     videoConstraints: {
-
-                        facingMode: {
-                            ideal: "environment"
-                        },
-
-                        width: {
-                            ideal: 1920
-                        },
-
-                        height: {
-                            ideal: 1080
-                        },
-
+                        facingMode: { ideal: "environment" },
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 },
                         advanced: [
-
-                            {
-                                focusMode: "continuous"
-                            },
-
-                            {
-                                sharpness: 1
-                            },
-
-                            {
-                                contrast: 1
-                            }
+                            { focusMode: "continuous" },
+                            { sharpness: 1 },
+                            { contrast: 1 }
                         ]
                     },
-
-                    experimentalFeatures: {
-                        useBarCodeDetectorIfSupported: true
-                    },
-
+                    experimentalFeatures: { useBarCodeDetectorIfSupported: true },
                     formatsToSupport: [
-
                         Html5QrcodeSupportedFormats.CODE_128,
                         Html5QrcodeSupportedFormats.CODE_39,
                         Html5QrcodeSupportedFormats.EAN_13,
@@ -701,374 +401,186 @@ async function kameraAc() {
                         Html5QrcodeSupportedFormats.QR_CODE
                     ]
                 },
-
                 async (decodedText) => {
-
-                    $('#b')
-                        .val(decodedText)
-                        .trigger('change');
-
-                    if (navigator.vibrate) {
-                        navigator.vibrate(120);
-                    }
-
+                    $('#b').val(decodedText);
+                    lotlariGetir(decodedText); // Kameradan okutulunca direkt getirir
+                    if (navigator.vibrate) navigator.vibrate(120);
                     try {
-
-                        if (focusInterval) {
-                            clearInterval(focusInterval);
-                        }
-
+                        if (focusInterval) clearInterval(focusInterval);
                         await html5QrCode.stop();
                         await html5QrCode.clear();
-
                     } catch (e) {}
-
                     html5QrCode = null;
                     currentTrack = null;
-
                     readerDiv.style.display = 'none';
                 },
-
                 (errorMessage) => {}
             );
 
             setTimeout(async () => {
-
                 try {
+                    const videoElement = document.querySelector("#reader video");
+                    if (!videoElement || !videoElement.srcObject) return;
 
-                    const videoElement =
-                        document.querySelector("#reader video");
-
-                    if (!videoElement ||
-                        !videoElement.srcObject) {
-                        return;
-                    }
-
-                    const stream =
-                        videoElement.srcObject;
-
-                    const track =
-                        stream.getVideoTracks()[0];
-
-                    if (!track) {
-                        return;
-                    }
+                    const stream = videoElement.srcObject;
+                    const track = stream.getVideoTracks()[0];
+                    if (!track) return;
 
                     currentTrack = track;
+                    const capabilities = track.getCapabilities();
 
-                    const capabilities =
-                        track.getCapabilities();
-
-                    // autofocus
                     if (capabilities.focusMode) {
-
                         try {
-
-                            await track.applyConstraints({
-                                advanced: [
-                                    {
-                                        focusMode: "continuous"
-                                    }
-                                ]
-                            });
-
+                            await track.applyConstraints({ advanced: [{ focusMode: "continuous" }] });
                         } catch (e) {}
                     }
 
-                    // DEFAULT 2X
                     if (capabilities.zoom) {
-
                         try {
-
-                            if (
-                                capabilities.zoom.max &&
-                                zoomLevel > capabilities.zoom.max
-                            ) {
-                                zoomLevel =
-                                    capabilities.zoom.max;
+                            if (capabilities.zoom.max && zoomLevel > capabilities.zoom.max) {
+                                zoomLevel = capabilities.zoom.max;
                             }
-
-                            await track.applyConstraints({
-                                advanced: [
-                                    {
-                                        zoom: zoomLevel
-                                    }
-                                ]
-                            });
-
-                            // zoom sonrası focus reset
-                            await track.applyConstraints({
-                                advanced: [
-                                    {
-                                        focusMode: "continuous"
-                                    }
-                                ]
-                            });
-
-                            document
-                                .getElementById("zoomBtn")
-                                .innerHTML =
-                                `🔍 ${zoomLevel}x`;
-
+                            await track.applyConstraints({ advanced: [{ zoom: zoomLevel }] });
+                            await track.applyConstraints({ advanced: [{ focusMode: "continuous" }] });
+                            document.getElementById("zoomBtn").innerHTML = `🔍 ${zoomLevel}x`;
                         } catch (e) {}
                     }
 
-                    // focus refresh
-                    focusInterval =
-                        setInterval(async () => {
+                    focusInterval = setInterval(async () => {
+                        try {
+                            if (!currentTrack) return;
+                            await currentTrack.applyConstraints({ advanced: [{ focusMode: "continuous" }] });
+                        } catch (e) {}
+                    }, 2500);
 
-                            try {
-
-                                if (!currentTrack)
-                                    return;
-
-                                await currentTrack.applyConstraints({
-                                    advanced: [
-                                        {
-                                            focusMode: "continuous"
-                                        }
-                                    ]
-                                });
-
-                            } catch (e) {}
-
-                        }, 2500);
-
-                    // flash
                     if (capabilities.torch) {
-
-                        document
-                            .getElementById("flashBtn")
-                            .style.display = "flex";
+                        document.getElementById("flashBtn").style.display = "flex";
                     }
-
-                    // zoom
                     if (capabilities.zoom) {
-
-                        document
-                            .getElementById("zoomBtn")
-                            .style.display = "block";
+                        document.getElementById("zoomBtn").style.display = "block";
                     }
 
                 } catch (err) {
-
                     console.log(err);
                 }
-
             }, 1000);
 
         } catch (err) {
-
             console.error(err);
-
             alert("Kamera hatası: " + err);
-
             readerDiv.style.display = 'none';
-
             if (html5QrCode) {
-
                 try {
                     await html5QrCode.stop();
                     await html5QrCode.clear();
                 } catch (e) {}
-
                 html5QrCode = null;
             }
         }
-
     }, 200);
 }
 
 
-
 async function flashDegistir() {
-
     if (!currentTrack) return;
-
     try {
-
         torchEnabled = !torchEnabled;
-
-        await currentTrack.applyConstraints({
-            advanced: [
-                {
-                    torch: torchEnabled
-                }
-            ]
-        });
-
-        const btn =
-            document.getElementById("flashBtn");
-
-        btn.innerHTML =
-            torchEnabled
-                ? "🔦 Flash Kapat"
-                : "💡 Flash Aç";
-
+        await currentTrack.applyConstraints({ advanced: [{ torch: torchEnabled }] });
+        const btn = document.getElementById("flashBtn");
+        btn.innerHTML = torchEnabled ? "🔦 Flash Kapat" : "💡 Flash Aç";
     } catch (e) {
-
         console.log("Torch desteklenmiyor", e);
     }
 }
 
 
-
 async function zoomDegistir() {
-
     if (!currentTrack) return;
-
     try {
-
-        const capabilities =
-            currentTrack.getCapabilities();
-
+        const capabilities = currentTrack.getCapabilities();
         if (!capabilities.zoom) return;
 
-        // 2x -> 3x -> 1x
-        if (zoomLevel === 2) {
-            zoomLevel = 3;
-        }
-        else if (zoomLevel === 3) {
-            zoomLevel = 1;
-        }
-        else {
-            zoomLevel = 2;
-        }
+        if (zoomLevel === 2) zoomLevel = 3;
+        else if (zoomLevel === 3) zoomLevel = 1;
+        else zoomLevel = 2;
 
-        if (
-            capabilities.zoom.max &&
-            zoomLevel > capabilities.zoom.max
-        ) {
+        if (capabilities.zoom.max && zoomLevel > capabilities.zoom.max) {
             zoomLevel = capabilities.zoom.max;
         }
 
-        // zoom uygula
-        await currentTrack.applyConstraints({
-            advanced: [
-                {
-                    zoom: zoomLevel
-                }
-            ]
-        });
-
-        // focus reset
+        await currentTrack.applyConstraints({ advanced: [{ zoom: zoomLevel }] });
         try {
-
-            await currentTrack.applyConstraints({
-                advanced: [
-                    {
-                        focusMode: "continuous"
-                    }
-                ]
-            });
-
+            await currentTrack.applyConstraints({ advanced: [{ focusMode: "continuous" }] });
         } catch (e) {}
 
-        document.getElementById("zoomBtn")
-            .innerHTML = `🔍 ${zoomLevel}x`;
-
+        document.getElementById("zoomBtn").innerHTML = `🔍 ${zoomLevel}x`;
     } catch (e) {
-
         console.log("Zoom desteklenmiyor", e);
     }
 }
 
 
-
 async function kaydet() {
-
     let finalLot = $('#lot_select').val();
-
     if (finalLot === "YENI_LOT" || finalLot === "") {
         finalLot = $('#lot_input').val().trim();
     }
 
-    const d = { 
+    // Ürün adı mantığı: Eğer select "YENI_URUN" ise alttaki inputtan çek
+    let finalIsim = $('#n').val();
+    if (finalIsim === "YENI_URUN" || finalIsim === "") {
+        finalIsim = $('#isim_input').val().trim();
+    }
 
-        barkod: $('#b').val().trim(), 
-        isim: $('#n').val().trim(), 
-        lot: finalLot,
-        miktar: parseInt($('#m').val()) || 0, 
-        kategori_ad: $('#k').val() || "GENEL",
-        islem_nedeni: $('#islem_nedeni').val(),
-        not_alani: $('#not_alani').val(),
-        yer: $('#y').val()
+    const d = {
+        barkod:        $('#b').val().trim(),
+        isim:          finalIsim,
+        lot:           finalLot,
+        kutu_ici:      $('#kutu_ici').val().trim(),
+        miktar:        parseInt($('#m').val()) || 0,
+        kategori_ad:   $('#k').val() || "GENEL",
+        islem_nedeni:  $('#islem_nedeni').val(),
+        not_alani:     $('#not_alani').val(),
+        yer:           $('#y').val()
     };
-    
-    
-    if(!d.barkod || !d.isim)
-        return bildirim(
-            "BARKOD VE İSİM BOŞ OLAMAZ!",
-            "error"
-        );
 
-    if(d.miktar <= 0)
-        return bildirim(
-            "MİKTAR GEÇERSİZ!",
-            "error"
-        );
+    if (!d.barkod || !d.isim)
+        return bildirim("BARKOD VE İSİM BOŞ OLAMAZ!", "error");
 
-    const res = await fetch('/urunler/', { 
+    if (d.miktar <= 0)
+        return bildirim("MİKTAR GEÇERSİZ!", "error");
 
+    const res = await fetch('/urunler/', {
         method: 'POST',
-
-        headers: {
-            'Content-Type': 'application/json'
-        },
-
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(d)
     });
 
-    if(res.ok) { 
-
+    if (res.ok) {
         bildirim("STOK KAYDEDİLDİ!");
-
-        setTimeout(
-            () => location.reload(),
-            1000
-        );
-
+        setTimeout(() => location.reload(), 1000);
     } else {
-
         const err = await res.json();
-
-        bildirim(
-            err.detail || "HATA!",
-            "error"
-        );
+        bildirim(err.detail || "HATA!", "error");
     }
 }
 
 
-
-const style =
-    document.createElement('style');
-
+const style = document.createElement('style');
 style.innerHTML = `
-
 #reader video{
     width:100% !important;
     height:auto !important;
     object-fit:cover;
     border-radius:14px;
-
     transform:translateZ(0);
     backface-visibility:hidden;
 }
-
 @media (max-width:768px){
-
-    #reader-wrapper{
-        max-width:300px !important;
-    }
-
-    #reader video{
-        max-height:320px !important;
-    }
+    #reader-wrapper{ max-width:300px !important; }
+    #reader video{ max-height:320px !important; }
 }
-
 `;
-
 document.head.appendChild(style);
 
 </script>
