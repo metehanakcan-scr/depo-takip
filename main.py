@@ -36,7 +36,7 @@ import database
 from database import engine, SessionLocal, Base
 
 from urllib.parse import unquote
-
+from datetime import datetime, timedelta
 # ... (Mevcut importlarının altına ekle) ...
 
 
@@ -262,17 +262,48 @@ def root(): return RedirectResponse(url="/stok-paneli/")
 # --- 2. STOK PANELİ (Dashboard) ---
 @app.get("/stok-paneli/", response_class=HTMLResponse)
 def dashboard(request: Request, db: Session = Depends(get_db)):
-    # Tüm tabloyu Python'un RAM'ine çekip saydırmak yerine, bu işi SQL'in kendisine yaptırıyoruz. (Çok hızlıdır)
+    # Temel Metrikler
     cesit = db.query(func.count(models.UrunModel.id)).scalar() or 0
     adet = db.query(func.sum(models.UrunModel.miktar)).scalar() or 0
-    kritik = db.query(func.count(models.UrunModel.id)).filter(models.UrunModel.miktar < 10).scalar() or 0
     
-    istatistik = {"cesit": cesit, "adet": adet, "kritik": kritik}
+    # --- KRİTİK VE TÜKENEN STOK LİSTELERİ ---
+    kritik_liste = db.query(models.UrunModel).filter(
+        models.UrunModel.miktar < 10, 
+        models.UrunModel.miktar > 0
+    ).all()
     
-    # Ekrana basılacak liste için N+1 çözümünü uyguluyoruz.
+    sifir_liste = db.query(models.UrunModel).filter(
+        models.UrunModel.miktar == 0
+    ).all()
+
+    # --- EKSİK OLAN DİĞER KARTLARIN VERİLERİ (YENİ) ---
+    from datetime import date
+    bugun_hareket = db.query(func.count(models.StokHareketi.id)).filter(
+        func.date(models.StokHareketi.tarih) == date.today()
+    ).scalar() or 0
+    
+    kategori_sayisi = db.query(func.count(models.Kategori.id)).scalar() or 0
+    musteri_sayisi = db.query(func.count(models.Musteri.id)).scalar() or 0
+
+    # Bütün veriyi HTML'e göndermek için paketliyoruz
+    istatistik = {
+        "cesit": cesit, 
+        "adet": adet, 
+        "kritik": len(kritik_liste),
+        "kritik_liste": kritik_liste,
+        "sifir": len(sifir_liste),
+        "sifir_liste": sifir_liste,
+        "bugun_hareket": bugun_hareket,
+        "kategori_sayisi": kategori_sayisi,
+        "musteri_sayisi": musteri_sayisi
+    }
+
+    # Normal ürün listesi tablosu için
     urunler_sorgusu = db.query(models.UrunModel).options(joinedload(models.UrunModel.kategori)).all()
     
     return templates.TemplateResponse("index.html", {"request": request, "istatistik": istatistik, "urunler": urunler_sorgusu})
+
+
 
 # --- 1. ÜRÜN LİSTESİ (En çok yavaşlayan sayfa) ---
 @app.get("/urun-listesi/", response_class=HTMLResponse)
@@ -300,6 +331,8 @@ def stok_cikisi_sayfasi(request: Request, db: Session = Depends(get_db)):
     return templates.TemplateResponse("cikis.html", {"request": request, "urunler": urunler_sorgusu, "musteriler": db.query(models.Musteri).all()})
 
 
+
+
 @app.get("/stok-hareketleri/", response_class=HTMLResponse)
 def hareket_sayfasi(
     request: Request, 
@@ -308,7 +341,8 @@ def hareket_sayfasi(
     f_lot: str = None, 
     f_islem: str = None, 
     f_musteri: str = None, 
-    f_tarih: str = None, 
+    f_baslangic: str = None,  # URL'den gelen başlangıç tarihi
+    f_bitis: str = None,      # URL'den gelen bitiş tarihi
     f_not: str = None, 
     db: Session = Depends(get_db)
 ):
@@ -330,14 +364,32 @@ def hareket_sayfasi(
             (models.StokHareketi.musteri_ad.ilike(f"%{f_musteri}%")) | 
             (models.StokHareketi.islem_nedeni.ilike(f"%{f_musteri}%"))
         )
-    if f_tarih: query = query.filter(func.to_char(models.StokHareketi.tarih, 'DD.MM.YYYY HH24:MI').ilike(f"%{f_tarih}%"))
+        
+    # --- Tarih Aralığı Filtreleme Mantığı ---
+    if f_baslangic:
+        try:
+            # Gelen DD.MM.YYYY formatını datetime objesine çeviriyoruz
+            baslangic_dt = datetime.strptime(f_baslangic, '%d.%m.%Y')
+            query = query.filter(models.StokHareketi.tarih >= baslangic_dt)
+        except ValueError:
+            pass
+            
+    if f_bitis:
+        try:
+            # Bitiş tarihinin o günkü saat 23:59:59'u da kapsaması için 1 gün ekleyip 1 saniye çıkarıyoruz
+            bitis_dt = datetime.strptime(f_bitis, '%d.%m.%Y') + timedelta(days=1, seconds=-1)
+            query = query.filter(models.StokHareketi.tarih <= bitis_dt)
+        except ValueError:
+            pass
+
     if f_not: query = query.filter(models.StokHareketi.aciklama.ilike(f"%{f_not}%"))
     
     # Önce ham fitrelenmiş hareketleri çekiyoruz
     filtreli_hareketler = query.order_by(models.StokHareketi.id.desc()).all()
     
     # --- Gruplama Mantığı ---
-    if f_urun or f_lot or f_islem or f_musteri or f_tarih or f_not or f_islem_no:
+    # f_tarih yerine f_baslangic veya f_bitis varsa koşulunu ekledik
+    if f_urun or f_lot or f_islem or f_musteri or f_baslangic or f_bitis or f_not or f_islem_no:
         eslesen_islem_nolar = {h.islem_no for h in filtreli_hareketler if h.islem_no}
         tum_kalemler = db.query(models.StokHareketi).filter(models.StokHareketi.islem_no.in_(eslesen_islem_nolar)).order_by(models.StokHareketi.id.desc()).all()
     else:
@@ -359,13 +411,16 @@ def hareket_sayfasi(
                 "kalemler": []
             }
         gruplanmis[no]["kalemler"].append({
-            "barkod": h.urun_barkod or "",  # Barkod alanı buraya eklendi
+            "barkod": h.urun_barkod or "",  
             "urun_isim": h.urun_isim,
             "urun_lot": h.urun_lot or "-",
             "miktar_degisimi": h.miktar_degisimi
         })
 
     kart_listesi = sorted(gruplanmis.values(), key=lambda x: x["tarih"] if x["tarih"] else datetime.min, reverse=True)
+
+    # HTML tarafında eski f_tarih inputu value bekliyorsa kırılmasın diye manuel birleştiriyoruz
+    tarih_metni = f"{f_baslangic} to {f_bitis}" if f_baslangic and f_bitis else (f_baslangic or "")
 
     return templates.TemplateResponse("hareketler.html", {
         "request": request, 
@@ -376,7 +431,7 @@ def hareket_sayfasi(
             "lot": f_lot or "", 
             "islem": f_islem or "", 
             "musteri": f_musteri or "", 
-            "tarih": f_tarih or "",
+            "tarih": tarih_metni, # Şablon uyumluluğu için korundu
             "not": f_not or ""
         }
     })
@@ -781,6 +836,7 @@ def urun_ekle_api(u: schemas.UrunSema, db: Session = Depends(get_db), request: R
             miktar=u.miktar,
             kategori_id=kat.id,
             yer=u.yer.upper() if u.yer else "BELİRTİLMEDİ",
+            kutu_ici = u.kutu_ici
             
         ))
 

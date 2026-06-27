@@ -43,7 +43,12 @@
         table-layout: fixed; 
     }
     .col-islem-no { width: 80px; padding: 15px; }
-    .col-tarih    { width: 130px; } /* Aralık (İki tarih) seçimi için genişletildi */
+    .col-tarih{ width:220px; }
+    #f_tarih{
+        text-align:center;
+        min-width:190px;
+    }
+    
     .col-urun     { width: 140px; } 
     .col-lot      { width: 90px; }
     .col-islem    { width: 100px; } 
@@ -153,6 +158,8 @@
         
         .alt-col-islem, .alt-col-cari, .alt-col-not { display: none; }
     }
+
+
 </style>
 
 <div class="history-container">
@@ -329,14 +336,13 @@
 </div>
 
 <script>
-    // Flatpickr Kurulumu (URL Parametrelerine Göre Akıllı Dolum)
+    // Flatpickr Kurulumu
     document.addEventListener("DOMContentLoaded", function() {
         const urlParams = new URLSearchParams(window.location.search);
         const baslangic = urlParams.get('f_baslangic');
         const bitis = urlParams.get('f_bitis');
         let defaultDateValue = null;
 
-        // URL'de halihazırda var olan tarihleri takvime varsayılan olarak yazdır
         if (baslangic && bitis) {
             defaultDateValue = [baslangic, bitis];
         } else if (baslangic) {
@@ -349,8 +355,7 @@
             dateFormat: "d.m.Y",
             defaultDate: defaultDateValue,
             onClose: function(selectedDates, dateStr, instance) {
-                // Sadece iki tarih seçildiğinde (Aralık tamamlandığında) veya tek bir tarih kesinleştiğinde filtrele
-                if (selectedDates.length === 2 || selectedDates.length === 1) {
+                if (selectedDates.length === 2) {
                     canliFiltre();
                 }
             }
@@ -382,30 +387,53 @@
 
     // Geliştirilmiş Dinamik URL Arama Fonksiyonu
     function canliFiltre() {
-        const ino = document.getElementById('f_islem_no').value;
-        const u = document.getElementById('f_urun').value;
-        const l = document.getElementById('f_lot').value;
-        const i = document.getElementById('f_islem').value;
-        const m = document.getElementById('f_musteri').value;
-        const n = document.getElementById('f_not').value;
+        // 1. Olası TypeError çökmelerini önlemek için ?. (Optional Chaining) kullanıldı
+        const ino = document.getElementById('f_islem_no')?.value || "";
+        const u = document.getElementById('f_urun')?.value || "";
+        const l = document.getElementById('f_lot')?.value || "";
+        const i = document.getElementById('f_islem')?.value || "";
+        const m = document.getElementById('f_musteri')?.value || "";
+        const n = document.getElementById('f_not')?.value || "";
         
-        // Tarih Parsing (Flatpickr 'range' modu to stringini üretir)
-        const tarihRange = document.getElementById('f_tarih').value;
         let baslangic = "";
         let bitis = "";
         
-        if (tarihRange.includes(" to ")) {
-            const tarihler = tarihRange.split(" to ");
-            baslangic = tarihler[0].trim();
-            bitis = tarihler[1].trim();
-        } else if (tarihRange) {
-            baslangic = tarihRange.trim();
-            bitis = tarihRange.trim();
+        // 2. Tarihi düz metinden parçalamak yerine doğrudan Flatpickr objesinden güvenle çekiyoruz
+        const tarihInput = document.getElementById('f_tarih');
+        if (tarihInput && tarihInput._flatpickr && tarihInput._flatpickr.selectedDates.length > 0) {
+            const secilenler = tarihInput._flatpickr.selectedDates;
+            
+            // Tarihi d.m.Y formatına çeviren küçük bir yardımcı
+            const formatla = (tarih) => {
+                const d = String(tarih.getDate()).padStart(2, '0');
+                const m = String(tarih.getMonth() + 1).padStart(2, '0');
+                const y = tarih.getFullYear();
+                return `${d}.${m}.${y}`; 
+            };
+
+            baslangic = formatla(secilenler[0]);
+            // Tek tarih seçilmişse bitişi de başlangıçla aynı yap, iki tane varsa ikinciyi al
+            bitis = secilenler.length === 2 ? formatla(secilenler[1]) : baslangic;
+        } else {
+            // Flatpickr henüz yüklenmediyse veya başka bir hata varsa çalışan güvenli fallback
+            const tarihRange = tarihInput?.value || "";
+            if (tarihRange.includes(" to ")) {
+                const tarihler = tarihRange.split(" to ");
+                baslangic = tarihler[0].trim();
+                bitis = tarihler[1].trim();
+            } else if (tarihRange.includes(" - ")) {
+                const tarihler = tarihRange.split(" - ");
+                baslangic = tarihler[0].trim();
+                bitis = tarihler[1].trim();
+            } else if (tarihRange) {
+                baslangic = tarihRange.trim();
+                bitis = tarihRange.trim();
+            }
         }
 
         const params = new URLSearchParams();
         
-        // Boş olmayan değerleri URL'e temiz bir şekilde ekle
+        // Sadece dolu olanları URL'e ekle
         if (ino) params.append('f_islem_no', ino);
         if (u) params.append('f_urun', u);
         if (l) params.append('f_lot', l);
@@ -415,7 +443,6 @@
         if (bitis) params.append('f_bitis', bitis);
         if (n) params.append('f_not', n);
 
-        // Arama sayfasına filtreleri ekleyerek yenile
         window.location.href = `/stok-hareketleri/?${params.toString()}`;
     }
 

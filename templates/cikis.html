@@ -176,25 +176,45 @@
         </div>
 
         <div>
-
             <label style="color:#475569;">
                 MÜŞTERİ 
             </label>
 
-            <select id="n" style="width:100%;">
-
+            <select id="n" style="width:100%; margin-bottom: 10px;" onchange="musteriSecimiKontrol(this.value)">
                 <option value=""></option>
+                
+                <option value="YENI_EKLE" style="font-weight: bold; color: #3b82f6;">
+                    + Yeni Müşteri Ekle
+                </option>
 
                 {% for m in musteriler %}
-
                 <option value="{{ m.ad }}">
                     {{ m.ad }}
                 </option>
-
                 {% endfor %}
             </select>
-
+            <br><br><br>
+            <form id="yeni_musteri_formu" onsubmit="musteriEkle(event)" style="display: none; gap: 5px; margin-bottom: 15px;">
+                <input type="text" id="mus_input" placeholder="Müşteri Adı..." required style="flex: 1; height: 36px; font-size: 12px; padding: 0 10px; border-radius: 8px; border: 1px solid #e2e8f0; background: #f8fafc;">
+                <button type="submit" style="background: #3b82f6; color: white; height: 36px; padding: 0 15px; font-size: 11px; font-weight: bold; border: none; border-radius: 8px; cursor: pointer;">EKLE</button>
+            </form>
         </div>
+
+        <script>
+            function musteriSecimiKontrol(secilenDeger) {
+                const form = document.getElementById('yeni_musteri_formu');
+                
+                if (secilenDeger === 'YENI_EKLE') {
+                    // Seçilirse formu senin tasarımınla (flex) göster
+                    form.style.display = 'flex';
+                } else {
+                    // Farklı bir şey seçilirse formu gizle
+                    form.style.display = 'none';
+                }
+            }
+
+          
+        </script>
 
     </div>
 
@@ -472,7 +492,7 @@ let currentTrack = null;
 let torchEnabled = false;
 let zoomLevel = 2;
 let focusInterval = null;
-
+ 
 async function kameraKapat() {
     try {
         if (focusInterval) {
@@ -656,6 +676,17 @@ async function zoomDegistir() {
         console.log("Zoom desteklenmiyor", e);
     }
 }
+
+async function hizliEkle(url, ad) {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: `ad=${encodeURIComponent(ad)}`
+        });
+        if(res.ok) location.reload(); else bildirim("Hata!", "error");
+    }
+
+function musteriEkle(e) { e.preventDefault(); hizliEkle('/musteri-ekle/', document.getElementById('mus_input').value); }
 
 </script>
 
